@@ -105,3 +105,4 @@ class PlatformException extends EasyAuthException {
     return buffer.toString();
   }
 }
+
