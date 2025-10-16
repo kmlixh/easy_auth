@@ -213,6 +213,54 @@ class EasyAuthApiClient {
     return await _pollLoginResult(tempToken);
   }
 
+  /// Google登录（需要先通过原生SDK获取authCode）
+  Future<LoginResult> loginWithGoogle({
+    required String authCode,
+    String? idToken,
+  }) async {
+    // 1. 调用login接口
+    final loginResponse = await _client.post(
+      Uri.parse('$baseUrl/user/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': 'google',
+        'channel_data': {
+          'code': authCode,
+          if (idToken != null) 'id_token': idToken,
+        },
+      }),
+    );
+
+    _handleResponse(loginResponse);
+
+    // 2. 调用loginCallback接口
+    final callbackResponse = await _client.post(
+      Uri.parse('$baseUrl/user/loginCallback'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': 'google',
+        'channel_data': {
+          'code': authCode,
+          if (idToken != null) 'id_token': idToken,
+        },
+      }),
+    );
+
+    final callbackData = _handleResponse(callbackResponse);
+    final tempToken = callbackData['temp_token'] as String?;
+
+    if (tempToken == null) {
+      throw EasyAuthException('No temp_token received');
+    }
+
+    // 3. 轮询loginResult获取最终token
+    return await _pollLoginResult(tempToken);
+  }
+
   /// 刷新Token
   Future<String> refreshToken(String token) async {
     final response = await _client.post(
