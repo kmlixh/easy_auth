@@ -24,6 +24,9 @@ class EasyAuthLoginPage extends StatefulWidget {
   /// 显示第三方登录
   final bool showThirdPartyLogin;
 
+  /// 主题色
+  final Color? primaryColor;
+
   const EasyAuthLoginPage({
     super.key,
     this.onLoginSuccess,
@@ -32,6 +35,7 @@ class EasyAuthLoginPage extends StatefulWidget {
     this.showSMSLogin = true,
     this.showEmailLogin = true,
     this.showThirdPartyLogin = true,
+    this.primaryColor,
   });
 
   @override
@@ -70,6 +74,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = widget.primaryColor ?? theme.primaryColor;
+    
     final tabs = <Widget>[];
     final tabViews = <Widget>[];
 
@@ -77,8 +84,11 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
       tabs.add(const Tab(text: '短信登录'));
       tabViews.add(
         SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: SMSLoginForm(onLoginSuccess: _handleLoginSuccess),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: SMSLoginForm(
+            onLoginSuccess: _handleLoginSuccess,
+            primaryColor: primaryColor,
+          ),
         ),
       );
     }
@@ -87,61 +97,112 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
       tabs.add(const Tab(text: '邮箱登录'));
       tabViews.add(
         SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: EmailLoginForm(onLoginSuccess: _handleLoginSuccess),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: EmailLoginForm(
+            onLoginSuccess: _handleLoginSuccess,
+            primaryColor: primaryColor,
+          ),
         ),
       );
     }
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(widget.title),
+        centerTitle: true,
         elevation: 0,
-        bottom: tabs.isNotEmpty
-            ? TabBar(controller: _tabController, tabs: tabs)
-            : null,
+        backgroundColor: Colors.transparent,
+        foregroundColor: theme.textTheme.bodyLarge?.color,
       ),
-      body: Column(
-        children: [
-          // Logo区域
-          if (widget.logo != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: widget.logo,
-            ),
-
-          // 登录表单
-          Expanded(
-            child: tabViews.isNotEmpty
-                ? TabBarView(controller: _tabController, children: tabViews)
-                : const Center(child: Text('请配置至少一种登录方式')),
-          ),
-
-          // 第三方登录
-          if (widget.showThirdPartyLogin)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          '其他登录方式',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ThirdPartyLoginButtons(onLoginSuccess: _handleLoginSuccess),
-                ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Logo区域
+            if (widget.logo != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: widget.logo,
               ),
+
+            // Tab切换
+            if (tabs.length > 1)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  tabs: tabs,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(25),
+                    color: primaryColor,
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: theme.textTheme.bodyMedium?.color,
+                  dividerColor: Colors.transparent,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                ),
+              ),
+
+            const SizedBox(height: 16),
+
+            // 登录表单
+            Expanded(
+              child: tabViews.isNotEmpty
+                  ? TabBarView(controller: _tabController, children: tabViews)
+                  : const Center(child: Text('请配置至少一种登录方式')),
             ),
-        ],
+
+            // 第三方登录
+            if (widget.showThirdPartyLogin)
+              Container(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(
+                            color: theme.dividerColor.withOpacity(0.3),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            '其他登录方式',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.textTheme.bodySmall?.color
+                                  ?.withOpacity(0.6),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Divider(
+                            color: theme.dividerColor.withOpacity(0.3),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    ThirdPartyLoginButtons(
+                      onLoginSuccess: _handleLoginSuccess,
+                      primaryColor: primaryColor,
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -25,6 +25,9 @@ class ThirdPartyLoginButtons extends StatelessWidget {
   final ButtonStyle? appleButtonStyle;
   final ButtonStyle? googleButtonStyle;
 
+  /// 主题色
+  final Color? primaryColor;
+
   const ThirdPartyLoginButtons({
     super.key,
     this.onLoginSuccess,
@@ -35,6 +38,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     this.wechatButtonStyle,
     this.appleButtonStyle,
     this.googleButtonStyle,
+    this.primaryColor,
   });
 
   /// 微信登录
@@ -148,7 +152,10 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google登录失败: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Google登录失败: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       onLoginFailed?.call(e);
@@ -157,25 +164,19 @@ class ThirdPartyLoginButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final buttons = <Widget>[];
 
     // 微信登录按钮
     if (showWechat) {
       buttons.add(
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () => _loginWithWechat(context),
-            style:
-                wechatButtonStyle ??
-                OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF07C160),
-                  side: const BorderSide(color: Color(0xFF07C160)),
-                ),
-            icon: const Icon(Icons.wechat, size: 24),
-            label: const Text('微信登录'),
-          ),
+        _buildLoginButton(
+          context: context,
+          icon: Icons.wechat,
+          label: '微信登录',
+          color: const Color(0xFF07C160),
+          onPressed: () => _loginWithWechat(context),
+          style: wechatButtonStyle,
         ),
       );
     }
@@ -186,20 +187,15 @@ class ThirdPartyLoginButtons extends StatelessWidget {
         buttons.add(const SizedBox(height: 12));
       }
       buttons.add(
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () => _loginWithApple(context),
-            style:
-                appleButtonStyle ??
-                OutlinedButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Colors.black),
-                ),
-            icon: const Icon(Icons.apple, size: 24),
-            label: const Text('Apple登录'),
-          ),
+        _buildLoginButton(
+          context: context,
+          icon: Icons.apple,
+          label: 'Apple登录',
+          color: theme.brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black,
+          onPressed: () => _loginWithApple(context),
+          style: appleButtonStyle,
         ),
       );
     }
@@ -210,20 +206,14 @@ class ThirdPartyLoginButtons extends StatelessWidget {
         buttons.add(const SizedBox(height: 12));
       }
       buttons.add(
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: OutlinedButton.icon(
-            onPressed: () => _loginWithGoogle(context),
-            style:
-                googleButtonStyle ??
-                OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF4285F4),
-                  side: const BorderSide(color: Color(0xFF4285F4)),
-                ),
-            icon: const Icon(Icons.g_mobiledata, size: 32),
-            label: const Text('Google登录'),
-          ),
+        _buildLoginButton(
+          context: context,
+          icon: Icons.g_mobiledata,
+          label: 'Google登录',
+          color: const Color(0xFF4285F4),
+          onPressed: () => _loginWithGoogle(context),
+          style: googleButtonStyle,
+          iconSize: 32,
         ),
       );
     }
@@ -235,6 +225,41 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: buttons,
+    );
+  }
+
+  Widget _buildLoginButton({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+    ButtonStyle? style,
+    double iconSize = 24,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        style:
+            style ??
+            OutlinedButton.styleFrom(
+              foregroundColor: color,
+              side: BorderSide(color: color.withOpacity(0.3), width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(26),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+            ),
+        icon: Icon(icon, size: iconSize),
+        label: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }
