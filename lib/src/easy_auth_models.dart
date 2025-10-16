@@ -159,3 +159,59 @@ extension LoginChannelExtension on LoginChannel {
   }
 }
 
+/// 支持的登录渠道信息
+class SupportedChannel {
+  final String channelId;
+  final String channelName;
+  final String channelTitle;
+  final int sortOrder;
+
+  SupportedChannel({
+    required this.channelId,
+    required this.channelName,
+    required this.channelTitle,
+    required this.sortOrder,
+  });
+
+  factory SupportedChannel.fromJson(Map<String, dynamic> json) {
+    return SupportedChannel(
+      channelId: json['channel_id'] as String,
+      channelName: json['channel_name'] as String,
+      channelTitle: json['channel_title'] as String,
+      sortOrder: json['sort_order'] as int,
+    );
+  }
+}
+
+/// 租户配置信息
+class TenantConfig {
+  final String tenantId;
+  final String tenantName;
+  final String? icon;
+  final List<SupportedChannel> supportedChannels;
+  final String defaultChannel;
+
+  TenantConfig({
+    required this.tenantId,
+    required this.tenantName,
+    this.icon,
+    required this.supportedChannels,
+    required this.defaultChannel,
+  });
+
+  factory TenantConfig.fromJson(Map<String, dynamic> json) {
+    final channelsJson = json['supported_channels'] as List<dynamic>? ?? [];
+    final channels = channelsJson
+        .map((ch) => SupportedChannel.fromJson(ch as Map<String, dynamic>))
+        .toList();
+
+    return TenantConfig(
+      tenantId: json['tenant_id'] as String,
+      tenantName: json['tenant_name'] as String,
+      icon: json['icon'] as String?,
+      supportedChannels: channels,
+      defaultChannel: json['default_channel'] as String? ?? '',
+    );
+  }
+}
+

@@ -294,6 +294,17 @@ class EasyAuthApiClient {
     _handleResponse(response);
   }
 
+  /// 获取租户配置（可用的登录渠道）
+  Future<TenantConfig> getTenantConfig() async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/login/getTenantConfig?tenant_id=$tenantId'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    final data = _handleResponse(response);
+    return TenantConfig.fromJson(data);
+  }
+
   /// 轮询登录结果
   Future<LoginResult> _pollLoginResult(String tempToken) async {
     const maxAttempts = 30; // 最多尝试30次

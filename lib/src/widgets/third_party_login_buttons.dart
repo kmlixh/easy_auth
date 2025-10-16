@@ -169,98 +169,130 @@ class ThirdPartyLoginButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final buttons = <Widget>[];
+    final iconButtons = <Widget>[];
+
+    // 判断是否可用
+    bool isChannelAvailable(String channelId) {
+      if (availableChannels == null) return true;
+      return availableChannels!.contains(channelId);
+    }
 
     // 微信登录按钮
-    if (showWechat) {
-      buttons.add(
-        _buildLoginButton(
+    if (showWechat && isChannelAvailable('wechat')) {
+      iconButtons.add(
+        _buildIconButton(
           context: context,
           icon: Icons.wechat,
-          label: '微信登录',
+          label: '微信',
           color: const Color(0xFF07C160),
           onPressed: () => _loginWithWechat(context),
-          style: wechatButtonStyle,
         ),
       );
     }
 
     // Apple登录按钮
-    if (showApple) {
-      if (buttons.isNotEmpty) {
-        buttons.add(const SizedBox(height: 12));
-      }
-      buttons.add(
-        _buildLoginButton(
+    if (showApple && isChannelAvailable('apple')) {
+      iconButtons.add(
+        _buildIconButton(
           context: context,
           icon: Icons.apple,
-          label: 'Apple登录',
+          label: 'Apple',
           color: theme.brightness == Brightness.dark
               ? Colors.white
               : Colors.black,
           onPressed: () => _loginWithApple(context),
-          style: appleButtonStyle,
         ),
       );
     }
 
     // Google登录按钮
-    if (showGoogle) {
-      if (buttons.isNotEmpty) {
-        buttons.add(const SizedBox(height: 12));
-      }
-      buttons.add(
-        _buildLoginButton(
+    if (showGoogle && isChannelAvailable('google')) {
+      iconButtons.add(
+        _buildIconButton(
           context: context,
           icon: Icons.g_mobiledata,
-          label: 'Google登录',
+          label: 'Google',
           color: const Color(0xFF4285F4),
           onPressed: () => _loginWithGoogle(context),
-          style: googleButtonStyle,
           iconSize: 32,
         ),
       );
     }
 
-    if (buttons.isEmpty) {
+    if (iconButtons.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: buttons,
+    // 使用圆形图标按钮布局
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: _intersperse(
+        iconButtons,
+        const SizedBox(width: 32),
+      ).toList(),
     );
   }
 
-  Widget _buildLoginButton({
+  List<Widget> _intersperse(List<Widget> list, Widget separator) {
+    if (list.isEmpty) return list;
+    final result = <Widget>[];
+    for (var i = 0; i < list.length; i++) {
+      result.add(list[i]);
+      if (i < list.length - 1) {
+        result.add(separator);
+      }
+    }
+    return result;
+  }
+
+  Widget _buildIconButton({
     required BuildContext context,
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onPressed,
-    ButtonStyle? style,
-    double iconSize = 24,
+    double iconSize = 28,
   }) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        style:
-            style ??
-            OutlinedButton.styleFrom(
-              foregroundColor: color,
-              side: BorderSide(color: color.withOpacity(0.3), width: 1.5),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(26),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark ? Colors.grey[850] : Colors.grey[100],
+            border: Border.all(
+              color: color.withOpacity(0.3),
+              width: 1.5,
             ),
-        icon: Icon(icon, size: iconSize),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(30),
+              child: Center(
+                child: Icon(
+                  icon,
+                  size: iconSize,
+                  color: color,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDark ? Colors.grey[400] : Colors.grey[700],
+          ),
+        ),
+      ],
     );
   }
 }
