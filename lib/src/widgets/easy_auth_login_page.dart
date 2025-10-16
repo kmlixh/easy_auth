@@ -7,7 +7,7 @@ import 'email_login_form.dart';
 import 'enhanced_third_party_login_buttons.dart';
 
 /// EasyAuth 完整登录页面组件
-/// 
+///
 /// 根据租户配置自动显示支持的登录方式
 /// 只需传入 baseUrl 和 tenantId，其他配置自动从后端获取
 class EasyAuthLoginPage extends StatefulWidget {
@@ -71,20 +71,26 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
       print('   SceneID: ${widget.sceneId}');
 
       // 1. 初始化 EasyAuth
-      await EasyAuth().init(EasyAuthConfig(
-        baseUrl: widget.baseUrl,
-        tenantId: widget.tenantId,
-        sceneId: widget.sceneId,
-        enableAutoRefresh: true,
-      ));
+      await EasyAuth().init(
+        EasyAuthConfig(
+          baseUrl: widget.baseUrl,
+          tenantId: widget.tenantId,
+          sceneId: widget.sceneId,
+          enableAutoRefresh: true,
+        ),
+      );
 
       // 2. 获取租户配置
       print('📡 获取租户配置...');
-      final config = await EasyAuth().apiClient.getTenantConfig(widget.tenantId);
-      
+      final config = await EasyAuth().apiClient.getTenantConfig(
+        widget.tenantId,
+      );
+
       print('✅ 租户配置加载成功');
       print('   租户名称: ${config.tenantName}');
-      print('   支持的渠道: ${config.supportedChannels.map((e) => e.channelId).join(", ")}');
+      print(
+        '   支持的渠道: ${config.supportedChannels.map((e) => e.channelId).join(", ")}',
+      );
 
       setState(() {
         _tenantConfig = config;
@@ -136,10 +142,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
             children: [
               const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
-              Text(
-                '加载失败',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('加载失败', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               Text(
                 _error!,
@@ -165,9 +168,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
     }
 
     if (_tenantConfig == null || _tenantConfig!.supportedChannels.isEmpty) {
-      return const Center(
-        child: Text('该租户未配置任何登录方式'),
-      );
+      return const Center(child: Text('该租户未配置任何登录方式'));
     }
 
     return SingleChildScrollView(
@@ -208,7 +209,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
 
   Widget _buildLoginMethods(Color primaryColor) {
     final channels = _tenantConfig!.supportedChannels;
-    
+
     // 分离验证码登录和第三方登录
     final hasSMS = channels.any((ch) => ch.channelId == 'sms');
     final hasEmail = channels.any((ch) => ch.channelId == 'email');
@@ -303,4 +304,3 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
     );
   }
 }
-

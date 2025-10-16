@@ -73,12 +73,7 @@ class LoginResult {
 
   bool get isSuccess => status == LoginStatus.success;
 
-  LoginResult({
-    required this.status,
-    this.token,
-    this.userInfo,
-    this.message,
-  });
+  LoginResult({required this.status, this.token, this.userInfo, this.message});
 
   factory LoginResult.fromJson(Map<String, dynamic> json) {
     final statusStr = json['status'] as String?;
@@ -180,9 +175,11 @@ class TenantConfig {
       tenantId: json['tenant_id'] as String? ?? '',
       tenantName: json['tenant_name'] as String? ?? '',
       icon: json['icon'] as String? ?? '',
-      supportedChannels: (json['supported_channels'] as List<dynamic>?)
-              ?.map((e) =>
-                  SupportedChannelInfo.fromJson(e as Map<String, dynamic>))
+      supportedChannels:
+          (json['supported_channels'] as List<dynamic>?)
+              ?.map(
+                (e) => SupportedChannelInfo.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           [],
       defaultChannel: json['default_channel'] as String?,

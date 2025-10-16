@@ -67,10 +67,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
     }
     if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(phone)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请输入有效的手机号'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('请输入有效的手机号'), backgroundColor: Colors.red),
       );
       return;
     }
