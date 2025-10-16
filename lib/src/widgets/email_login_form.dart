@@ -184,7 +184,9 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                   hintText: '请输入邮箱地址',
                   prefixIcon: Icon(Icons.email_outlined, color: primaryColor),
                   filled: true,
-                  fillColor: theme.cardColor,
+                  fillColor: theme.brightness == Brightness.dark
+                      ? Colors.grey[850]
+                      : Colors.grey[100],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -239,7 +241,9 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                           color: primaryColor,
                         ),
                         filled: true,
-                        fillColor: theme.cardColor,
+                        fillColor: theme.brightness == Brightness.dark
+                            ? Colors.grey[850]
+                            : Colors.grey[100],
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,

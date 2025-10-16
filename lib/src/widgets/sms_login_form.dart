@@ -184,7 +184,9 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                   hintText: '请输入手机号',
                   prefixIcon: Icon(Icons.phone, color: primaryColor),
                   filled: true,
-                  fillColor: theme.cardColor,
+                  fillColor: theme.brightness == Brightness.dark
+                      ? Colors.grey[850]
+                      : Colors.grey[100],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -237,7 +239,9 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                           color: primaryColor,
                         ),
                         filled: true,
-                        fillColor: theme.cardColor,
+                        fillColor: theme.brightness == Brightness.dark
+                            ? Colors.grey[850]
+                            : Colors.grey[100],
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
