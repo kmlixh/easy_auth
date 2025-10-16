@@ -28,6 +28,9 @@ class ThirdPartyLoginButtons extends StatelessWidget {
   /// 主题色
   final Color? primaryColor;
 
+  /// 可用的登录渠道ID列表（从后端获取）
+  final List<String>? availableChannels;
+
   const ThirdPartyLoginButtons({
     super.key,
     this.onLoginSuccess,
@@ -39,6 +42,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     this.appleButtonStyle,
     this.googleButtonStyle,
     this.primaryColor,
+    this.availableChannels,
   });
 
   /// 微信登录

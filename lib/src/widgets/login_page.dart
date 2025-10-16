@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../easy_auth_core.dart';
 import '../easy_auth_models.dart';
 import 'sms_login_form.dart';
 import 'email_login_form.dart';
@@ -15,15 +16,6 @@ class EasyAuthLoginPage extends StatefulWidget {
   /// Logo
   final Widget? logo;
 
-  /// 显示短信登录
-  final bool showSMSLogin;
-
-  /// 显示邮箱登录
-  final bool showEmailLogin;
-
-  /// 显示第三方登录
-  final bool showThirdPartyLogin;
-
   /// 主题色
   final Color? primaryColor;
 
@@ -32,9 +24,6 @@ class EasyAuthLoginPage extends StatefulWidget {
     this.onLoginSuccess,
     this.title = '登录',
     this.logo,
-    this.showSMSLogin = true,
-    this.showEmailLogin = true,
-    this.showThirdPartyLogin = true,
     this.primaryColor,
   });
 
@@ -44,12 +33,50 @@ class EasyAuthLoginPage extends StatefulWidget {
 
 class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   int _selectedTabIndex = 0;
+  TenantConfig? _tenantConfig;
+  bool _loading = true;
+
+  // 验证码登录渠道（短信、邮箱）
+  List<SupportedChannel> _verificationChannels = [];
+  
+  // 第三方登录渠道（微信、Apple、Google）
+  List<SupportedChannel> _thirdPartyChannels = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTenantConfig();
+  }
+
+  Future<void> _loadTenantConfig() async {
+    try {
+      final config = await EasyAuth().apiClient.getTenantConfig();
+      setState(() {
+        _tenantConfig = config;
+        
+        // 分类渠道
+        _verificationChannels = config.supportedChannels
+            .where((ch) => ch.channelId == 'sms' || ch.channelId == 'email')
+            .toList();
+        
+        _thirdPartyChannels = config.supportedChannels
+            .where((ch) => ch.channelId != 'sms' && ch.channelId != 'email')
+            .toList();
+        
+        _loading = false;
+      });
+    } catch (e) {
+      print('加载租户配置失败: $e');
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
 
   void _handleLoginSuccess(LoginResult result) {
     if (widget.onLoginSuccess != null) {
       widget.onLoginSuccess!(result);
     } else {
-      // 默认行为：关闭登录页
       Navigator.of(context).pop(result);
     }
   }
@@ -59,27 +86,18 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
     final theme = Theme.of(context);
     final primaryColor = widget.primaryColor ?? theme.primaryColor;
     final isDark = theme.brightness == Brightness.dark;
-    
-    final tabs = <String>[];
-    final tabViews = <Widget>[];
 
-    if (widget.showSMSLogin) {
-      tabs.add('短信登录');
-      tabViews.add(
-        SMSLoginForm(
-          onLoginSuccess: _handleLoginSuccess,
-          primaryColor: primaryColor,
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: Text(widget.title),
+          centerTitle: true,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: theme.textTheme.bodyLarge?.color,
         ),
-      );
-    }
-
-    if (widget.showEmailLogin) {
-      tabs.add('邮箱登录');
-      tabViews.add(
-        EmailLoginForm(
-          onLoginSuccess: _handleLoginSuccess,
-          primaryColor: primaryColor,
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -102,8 +120,8 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                 child: widget.logo,
               ),
 
-            // Tab切换
-            if (tabs.length > 1)
+            // Tab切换（仅当有多个验证码登录方式时显示）
+            if (_verificationChannels.length > 1)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
                 child: Container(
@@ -113,8 +131,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
-                    children: List.generate(tabs.length, (index) {
+                    children: List.generate(_verificationChannels.length, (index) {
                       final isSelected = _selectedTabIndex == index;
+                      final channel = _verificationChannels[index];
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
@@ -130,7 +149,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                             ),
                             alignment: Alignment.center,
                             child: Text(
-                              tabs[index],
+                              channel.channelTitle,
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
@@ -151,14 +170,12 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: tabViews.isNotEmpty
-                    ? tabViews[_selectedTabIndex]
-                    : const Center(child: Text('请配置至少一种登录方式')),
+                child: _buildLoginForm(primaryColor),
               ),
             ),
 
             // 第三方登录
-            if (widget.showThirdPartyLogin)
+            if (_thirdPartyChannels.isNotEmpty)
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                 child: Column(
@@ -173,7 +190,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
-                            '其他登录方式',
+                            '使用社交账号直接登录',
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark ? Colors.grey[500] : Colors.grey[600],
@@ -191,6 +208,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                     ThirdPartyLoginButtons(
                       onLoginSuccess: _handleLoginSuccess,
                       primaryColor: primaryColor,
+                      availableChannels: _thirdPartyChannels.map((ch) => ch.channelId).toList(),
                     ),
                   ],
                 ),
@@ -199,5 +217,32 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildLoginForm(Color primaryColor) {
+    if (_verificationChannels.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('暂无可用的登录方式'),
+        ),
+      );
+    }
+
+    final selectedChannel = _verificationChannels[_selectedTabIndex];
+
+    if (selectedChannel.channelId == 'sms') {
+      return SMSLoginForm(
+        onLoginSuccess: _handleLoginSuccess,
+        primaryColor: primaryColor,
+      );
+    } else if (selectedChannel.channelId == 'email') {
+      return EmailLoginForm(
+        onLoginSuccess: _handleLoginSuccess,
+        primaryColor: primaryColor,
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }
