@@ -43,7 +43,7 @@ void main() async {
   // ⚠️ 必须在runApp之前初始化
   await EasyAuth().init(
     EasyAuthConfig(
-      baseUrl: 'https://your-anylogin-server.com',
+      baseUrl: 'https://api.janyee.com',  // anylogin 后端地址（不需要 /user 后缀）
       tenantId: 'your_tenant_id',
       sceneId: 'app_native',
       enableAutoRefresh: true,
