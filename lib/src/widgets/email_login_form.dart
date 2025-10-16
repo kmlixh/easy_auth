@@ -201,8 +201,10 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.red, width: 1),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                 ),
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
@@ -232,7 +234,10 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                       InputDecoration(
                         labelText: '验证码',
                         hintText: '请输入验证码',
-                        prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
+                        prefixIcon: Icon(
+                          Icons.lock_outline,
+                          color: primaryColor,
+                        ),
                         filled: true,
                         fillColor: theme.cardColor,
                         border: OutlineInputBorder(
@@ -249,8 +254,10 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Colors.red, width: 1),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -293,10 +300,7 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                           '$_countdown秒',
                           style: const TextStyle(fontSize: 13),
                         )
-                      : const Text(
-                          '发送验证码',
-                          style: TextStyle(fontSize: 13),
-                        ),
+                      : const Text('发送验证码', style: TextStyle(fontSize: 13)),
                 ),
               ),
             ],

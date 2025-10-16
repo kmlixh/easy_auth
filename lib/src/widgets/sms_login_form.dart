@@ -201,8 +201,10 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: const BorderSide(color: Colors.red, width: 1),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                 ),
             keyboardType: TextInputType.phone,
             validator: (value) {
@@ -230,7 +232,10 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                       InputDecoration(
                         labelText: '验证码',
                         hintText: '请输入验证码',
-                        prefixIcon: Icon(Icons.lock_outline, color: primaryColor),
+                        prefixIcon: Icon(
+                          Icons.lock_outline,
+                          color: primaryColor,
+                        ),
                         filled: true,
                         fillColor: theme.cardColor,
                         border: OutlineInputBorder(
@@ -247,8 +252,10 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                         ),
                         errorBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Colors.red, width: 1),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1,
+                          ),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -291,10 +298,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                           '$_countdown秒',
                           style: const TextStyle(fontSize: 13),
                         )
-                      : const Text(
-                          '发送验证码',
-                          style: TextStyle(fontSize: 13),
-                        ),
+                      : const Text('发送验证码', style: TextStyle(fontSize: 13)),
                 ),
               ),
             ],

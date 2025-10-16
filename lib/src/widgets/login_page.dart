@@ -42,26 +42,8 @@ class EasyAuthLoginPage extends StatefulWidget {
   State<EasyAuthLoginPage> createState() => _EasyAuthLoginPageState();
 }
 
-class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    final tabCount =
-        (widget.showSMSLogin ? 1 : 0) + (widget.showEmailLogin ? 1 : 0);
-    _tabController = TabController(
-      length: tabCount > 0 ? tabCount : 1,
-      vsync: this,
-    );
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
+  int _selectedTabIndex = 0;
 
   void _handleLoginSuccess(LoginResult result) {
     if (widget.onLoginSuccess != null) {
@@ -76,32 +58,27 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = widget.primaryColor ?? theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
     
-    final tabs = <Widget>[];
+    final tabs = <String>[];
     final tabViews = <Widget>[];
 
     if (widget.showSMSLogin) {
-      tabs.add(const Tab(text: '短信登录'));
+      tabs.add('短信登录');
       tabViews.add(
-        SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: SMSLoginForm(
-            onLoginSuccess: _handleLoginSuccess,
-            primaryColor: primaryColor,
-          ),
+        SMSLoginForm(
+          onLoginSuccess: _handleLoginSuccess,
+          primaryColor: primaryColor,
         ),
       );
     }
 
     if (widget.showEmailLogin) {
-      tabs.add(const Tab(text: '邮箱登录'));
+      tabs.add('邮箱登录');
       tabViews.add(
-        SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: EmailLoginForm(
-            onLoginSuccess: _handleLoginSuccess,
-            primaryColor: primaryColor,
-          ),
+        EmailLoginForm(
+          onLoginSuccess: _handleLoginSuccess,
+          primaryColor: primaryColor,
         ),
       );
     }
@@ -127,40 +104,57 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
 
             // Tab切换
             if (tabs.length > 1)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TabBar(
-                  controller: _tabController,
-                  tabs: tabs,
-                  indicator: BoxDecoration(
-                    borderRadius: BorderRadius.circular(25),
-                    color: primaryColor,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[850] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  labelColor: Colors.white,
-                  unselectedLabelColor: theme.textTheme.bodyMedium?.color,
-                  dividerColor: Colors.transparent,
-                  indicatorSize: TabBarIndicatorSize.tab,
+                  child: Row(
+                    children: List.generate(tabs.length, (index) {
+                      final isSelected = _selectedTabIndex == index;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedTabIndex = index;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: isSelected ? primaryColor : Colors.transparent,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              tabs[index],
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
+                                fontSize: 15,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
                 ),
               ),
 
-            const SizedBox(height: 16),
-
             // 登录表单
             Expanded(
-              child: tabViews.isNotEmpty
-                  ? TabBarView(controller: _tabController, children: tabViews)
-                  : const Center(child: Text('请配置至少一种登录方式')),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: tabViews.isNotEmpty
+                    ? tabViews[_selectedTabIndex]
+                    : const Center(child: Text('请配置至少一种登录方式')),
+              ),
             ),
 
             // 第三方登录
@@ -180,9 +174,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage>
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
                             '其他登录方式',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.textTheme.bodySmall?.color
-                                  ?.withOpacity(0.6),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark ? Colors.grey[500] : Colors.grey[600],
                             ),
                           ),
                         ),
