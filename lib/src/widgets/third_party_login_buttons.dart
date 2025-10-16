@@ -226,10 +226,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     // 使用圆形图标按钮布局
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: _intersperse(
-        iconButtons,
-        const SizedBox(width: 32),
-      ).toList(),
+      children: _intersperse(iconButtons, const SizedBox(width: 32)).toList(),
     );
   }
 
@@ -264,10 +261,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isDark ? Colors.grey[850] : Colors.grey[100],
-            border: Border.all(
-              color: color.withOpacity(0.3),
-              width: 1.5,
-            ),
+            border: Border.all(color: color.withOpacity(0.3), width: 1.5),
           ),
           child: Material(
             color: Colors.transparent,
@@ -275,11 +269,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
               onTap: onPressed,
               borderRadius: BorderRadius.circular(30),
               child: Center(
-                child: Icon(
-                  icon,
-                  size: iconSize,
-                  color: color,
-                ),
+                child: Icon(icon, size: iconSize, color: color),
               ),
             ),
           ),

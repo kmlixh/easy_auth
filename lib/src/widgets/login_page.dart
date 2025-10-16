@@ -38,7 +38,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
 
   // 验证码登录渠道（短信、邮箱）
   List<SupportedChannel> _verificationChannels = [];
-  
+
   // 第三方登录渠道（微信、Apple、Google）
   List<SupportedChannel> _thirdPartyChannels = [];
 
@@ -53,16 +53,16 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
       final config = await EasyAuth().apiClient.getTenantConfig();
       setState(() {
         _tenantConfig = config;
-        
+
         // 分类渠道
         _verificationChannels = config.supportedChannels
             .where((ch) => ch.channelId == 'sms' || ch.channelId == 'email')
             .toList();
-        
+
         _thirdPartyChannels = config.supportedChannels
             .where((ch) => ch.channelId != 'sms' && ch.channelId != 'email')
             .toList();
-        
+
         _loading = false;
       });
     } catch (e) {
@@ -123,7 +123,10 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
             // Tab切换（仅当有多个验证码登录方式时显示）
             if (_verificationChannels.length > 1)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 16,
+                ),
                 child: Container(
                   height: 48,
                   decoration: BoxDecoration(
@@ -131,7 +134,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
-                    children: List.generate(_verificationChannels.length, (index) {
+                    children: List.generate(_verificationChannels.length, (
+                      index,
+                    ) {
                       final isSelected = _selectedTabIndex == index;
                       final channel = _verificationChannels[index];
                       return Expanded(
@@ -144,7 +149,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                           child: Container(
                             margin: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: isSelected ? primaryColor : Colors.transparent,
+                              color: isSelected
+                                  ? primaryColor
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(20),
                             ),
                             alignment: Alignment.center,
@@ -153,9 +160,13 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                               style: TextStyle(
                                 color: isSelected
                                     ? Colors.white
-                                    : (isDark ? Colors.grey[400] : Colors.grey[700]),
+                                    : (isDark
+                                          ? Colors.grey[400]
+                                          : Colors.grey[700]),
                                 fontSize: 15,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -193,7 +204,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                             '使用社交账号直接登录',
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDark ? Colors.grey[500] : Colors.grey[600],
+                              color: isDark
+                                  ? Colors.grey[500]
+                                  : Colors.grey[600],
                             ),
                           ),
                         ),
@@ -208,7 +221,9 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                     ThirdPartyLoginButtons(
                       onLoginSuccess: _handleLoginSuccess,
                       primaryColor: primaryColor,
-                      availableChannels: _thirdPartyChannels.map((ch) => ch.channelId).toList(),
+                      availableChannels: _thirdPartyChannels
+                          .map((ch) => ch.channelId)
+                          .toList(),
                     ),
                   ],
                 ),
@@ -222,10 +237,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   Widget _buildLoginForm(Color primaryColor) {
     if (_verificationChannels.isEmpty) {
       return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text('暂无可用的登录方式'),
-        ),
+        child: Padding(padding: EdgeInsets.all(32), child: Text('暂无可用的登录方式')),
       );
     }
 
