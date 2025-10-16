@@ -57,13 +57,29 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
   Future<void> _sendCode() async {
     if (_countdown > 0) return;
 
-    // 验证邮箱
-    if (!_formKey.currentState!.validate()) return;
+    // 只验证邮箱，不验证验证码（此时用户还没输入验证码）
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入邮箱地址'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请输入有效的邮箱地址'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _loading = true);
 
     try {
-      await EasyAuth().sendEmailCode(_emailController.text);
+      print('📧 发送邮箱验证码: $email');
+      await EasyAuth().sendEmailCode(email);
 
       // 开始倒计时
       setState(() => _countdown = widget.countdownSeconds);

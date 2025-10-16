@@ -1,36 +1,22 @@
-/// 登录结果
-class LoginResult {
-  final LoginStatus status;
-  final String? token;
-  final UserInfo? userInfo;
-  final String? message;
-  final String? tempToken;
+/// EasyAuth 数据模型定义
+///
+/// 定义登录、用户信息等核心数据结构
 
-  LoginResult({
-    required this.status,
-    this.token,
-    this.userInfo,
-    this.message,
-    this.tempToken,
+/// 配置类
+class EasyAuthConfig {
+  final String baseUrl;
+  final String tenantId;
+  final String sceneId;
+  final bool enableAutoRefresh;
+  final Duration? autoRefreshInterval;
+
+  const EasyAuthConfig({
+    required this.baseUrl,
+    required this.tenantId,
+    required this.sceneId,
+    this.enableAutoRefresh = true,
+    this.autoRefreshInterval,
   });
-
-  bool get isSuccess => status == LoginStatus.success;
-  bool get isFailed => status == LoginStatus.failed;
-  bool get isPending => status == LoginStatus.pending;
-  bool get isTimeout => status == LoginStatus.timeout;
-
-  @override
-  String toString() {
-    return 'LoginResult(status: $status, token: $token, message: $message)';
-  }
-}
-
-/// 登录状态枚举
-enum LoginStatus {
-  success, // 登录成功
-  failed, // 登录失败
-  pending, // 等待中
-  timeout, // 超时
 }
 
 /// 用户信息
@@ -38,101 +24,115 @@ class UserInfo {
   final String userId;
   final String? username;
   final String? nickname;
-  final String? avatar;
   final String? email;
   final String? phone;
-  final Map<String, dynamic>? rawData;
+  final String? avatar;
+  final Map<String, dynamic>? extra;
 
   UserInfo({
     required this.userId,
     this.username,
     this.nickname,
-    this.avatar,
     this.email,
     this.phone,
-    this.rawData,
+    this.avatar,
+    this.extra,
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(
-      userId: json['user_id'] as String? ?? json['id'] as String,
+      userId: json['user_id'] as String? ?? '',
       username: json['username'] as String?,
       nickname: json['nickname'] as String?,
-      avatar: json['avatar'] as String?,
       email: json['email'] as String?,
       phone: json['phone'] as String?,
-      rawData: json,
+      avatar: json['avatar'] as String?,
+      extra: json['extra'] as Map<String, dynamic>?,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'user_id': userId,
-      'username': username,
-      'nickname': nickname,
-      'avatar': avatar,
-      'email': email,
-      'phone': phone,
-      ...?rawData,
+      if (username != null) 'username': username,
+      if (nickname != null) 'nickname': nickname,
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
+      if (avatar != null) 'avatar': avatar,
+      if (extra != null) 'extra': extra,
     };
   }
-
-  @override
-  String toString() {
-    return 'UserInfo(userId: $userId, nickname: $nickname, email: $email)';
-  }
 }
 
-/// 验证码发送结果
-class VerificationCodeResult {
-  final bool success;
+/// 登录结果
+class LoginResult {
+  final LoginStatus status;
+  final String? token;
+  final UserInfo? userInfo;
   final String? message;
-  final int? retryAfter; // 多少秒后可以重试
 
-  VerificationCodeResult({
-    required this.success,
+  bool get isSuccess => status == LoginStatus.success;
+
+  LoginResult({
+    required this.status,
+    this.token,
+    this.userInfo,
     this.message,
-    this.retryAfter,
   });
 
-  @override
-  String toString() {
-    return 'VerificationCodeResult(success: $success, message: $message, retryAfter: $retryAfter)';
+  factory LoginResult.fromJson(Map<String, dynamic> json) {
+    final statusStr = json['status'] as String?;
+    final status = LoginStatus.values.firstWhere(
+      (e) => e.name == statusStr,
+      orElse: () => LoginStatus.pending,
+    );
+
+    return LoginResult(
+      status: status,
+      token: json['token'] as String?,
+      userInfo: json['user_info'] != null
+          ? UserInfo.fromJson(json['user_info'] as Map<String, dynamic>)
+          : null,
+      message: json['message'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'status': status.name,
+      if (token != null) 'token': token,
+      if (userInfo != null) 'user_info': userInfo!.toJson(),
+      if (message != null) 'message': message,
+    };
   }
 }
 
-/// 登录配置
-class EasyAuthConfig {
-  final String baseUrl;
-  final String tenantId;
-  final String sceneId;
-  final Duration tokenExpiry;
-  final bool enableAutoRefresh;
+/// 登录状态
+enum LoginStatus {
+  /// 等待中（轮询中）
+  pending,
 
-  EasyAuthConfig({
-    required this.baseUrl,
-    required this.tenantId,
-    required this.sceneId,
-    this.tokenExpiry = const Duration(days: 7),
-    this.enableAutoRefresh = true,
-  });
+  /// 成功（已完成，且登录成功）
+  success,
 
-  @override
-  String toString() {
-    return 'EasyAuthConfig(baseUrl: $baseUrl, tenantId: $tenantId, sceneId: $sceneId)';
-  }
+  /// 失败（已完成，但登录失败）
+  failed,
+
+  /// 超时
+  timeout,
+
+  /// 取消
+  cancelled,
 }
 
-/// 第三方登录渠道
+/// 登录渠道
 enum LoginChannel {
-  wechat, // 微信
-  apple, // Apple ID
-  sms, // 短信
-  email, // 邮箱
-}
+  wechat,
+  apple,
+  sms,
+  email;
 
-extension LoginChannelExtension on LoginChannel {
-  String get channelId {
+  String get id {
     switch (this) {
       case LoginChannel.wechat:
         return 'wechat';
@@ -156,5 +156,79 @@ extension LoginChannelExtension on LoginChannel {
       case LoginChannel.email:
         return '邮箱验证码登录';
     }
+  }
+}
+
+/// 租户配置
+class TenantConfig {
+  final String tenantId;
+  final String tenantName;
+  final String icon;
+  final List<SupportedChannelInfo> supportedChannels;
+  final String? defaultChannel;
+
+  TenantConfig({
+    required this.tenantId,
+    required this.tenantName,
+    required this.icon,
+    required this.supportedChannels,
+    this.defaultChannel,
+  });
+
+  factory TenantConfig.fromJson(Map<String, dynamic> json) {
+    return TenantConfig(
+      tenantId: json['tenant_id'] as String? ?? '',
+      tenantName: json['tenant_name'] as String? ?? '',
+      icon: json['icon'] as String? ?? '',
+      supportedChannels: (json['supported_channels'] as List<dynamic>?)
+              ?.map((e) =>
+                  SupportedChannelInfo.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      defaultChannel: json['default_channel'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tenant_id': tenantId,
+      'tenant_name': tenantName,
+      'icon': icon,
+      'supported_channels': supportedChannels.map((e) => e.toJson()).toList(),
+      'default_channel': defaultChannel,
+    };
+  }
+}
+
+/// 支持的渠道信息
+class SupportedChannelInfo {
+  final String channelId;
+  final String channelName;
+  final String channelTitle;
+  final int sortOrder;
+
+  SupportedChannelInfo({
+    required this.channelId,
+    required this.channelName,
+    required this.channelTitle,
+    required this.sortOrder,
+  });
+
+  factory SupportedChannelInfo.fromJson(Map<String, dynamic> json) {
+    return SupportedChannelInfo(
+      channelId: json['channel_id'] as String? ?? '',
+      channelName: json['channel_name'] as String? ?? '',
+      channelTitle: json['channel_title'] as String? ?? '',
+      sortOrder: json['sort_order'] as int? ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'channel_id': channelId,
+      'channel_name': channelName,
+      'channel_title': channelTitle,
+      'sort_order': sortOrder,
+    };
   }
 }

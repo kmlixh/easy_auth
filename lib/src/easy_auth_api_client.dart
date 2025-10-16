@@ -301,6 +301,17 @@ class EasyAuthApiClient {
     );
   }
 
+  /// 获取租户配置
+  Future<TenantConfig> getTenantConfig(String tenantId) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.getTenantConfig}?tenant_id=$tenantId'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    final data = _handleResponse(response);
+    return TenantConfig.fromJson(data);
+  }
+
   /// 处理HTTP响应
   Map<String, dynamic> _handleResponse(http.Response response) {
     if (response.statusCode != 200) {

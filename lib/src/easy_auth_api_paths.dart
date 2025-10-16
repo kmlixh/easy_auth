@@ -15,4 +15,7 @@ class EasyAuthApiPaths {
   static const String sendSMSCode = '/sendSMSCode';
   static const String sendEmailCode = '/sendEmailCode';
   static const String verifyCode = '/verifyCode';
+
+  // 租户配置接口
+  static const String getTenantConfig = '/getTenantConfig';
 }

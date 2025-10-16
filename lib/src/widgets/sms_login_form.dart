@@ -57,13 +57,29 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
   Future<void> _sendCode() async {
     if (_countdown > 0) return;
 
-    // 验证手机号
-    if (!_formKey.currentState!.validate()) return;
+    // 只验证手机号，不验证验证码（此时用户还没输入验证码）
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入手机号'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(phone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请输入有效的手机号'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _loading = true);
 
     try {
-      await EasyAuth().sendSMSCode(_phoneController.text);
+      print('📱 发送短信验证码: $phone');
+      await EasyAuth().sendSMSCode(phone);
 
       // 开始倒计时
       setState(() => _countdown = widget.countdownSeconds);
