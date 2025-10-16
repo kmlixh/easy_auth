@@ -296,7 +296,7 @@ class EasyAuthApiClient {
 
   /// 获取租户配置（可用的登录渠道）
   Future<TenantConfig> getTenantConfig() async {
-    final url = '$baseUrl/login/getTenantConfig?tenant_id=$tenantId';
+    final url = '$baseUrl/user/login/getTenantConfig?tenant_id=$tenantId';
     print('🌐 [getTenantConfig] URL: $url');
     print('🌐 [getTenantConfig] TenantID: $tenantId');
     
