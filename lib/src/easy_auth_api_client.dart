@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'easy_auth_models.dart';
 import 'easy_auth_exception.dart';
+import 'easy_auth_api_paths.dart';
 
 /// EasyAuth API客户端
 /// 负责与anylogin后端服务通信
@@ -23,7 +24,7 @@ class EasyAuthApiClient {
   /// 发送短信验证码
   Future<void> sendSMSCode(String phoneNumber) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/sendSMSCode'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.sendSMSCode}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'tenant_id': tenantId, 'phone_number': phoneNumber}),
     );
@@ -34,7 +35,7 @@ class EasyAuthApiClient {
   /// 发送邮箱验证码
   Future<void> sendEmailCode(String email) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/sendEmailCode'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.sendEmailCode}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'tenant_id': tenantId, 'email': email}),
     );
@@ -49,7 +50,7 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
-      Uri.parse('$baseUrl/login'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -63,7 +64,7 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl/loginCallback'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -91,7 +92,7 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
-      Uri.parse('$baseUrl/login'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -105,7 +106,7 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl/loginCallback'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -130,7 +131,7 @@ class EasyAuthApiClient {
   Future<LoginResult> loginWithWechat(String authCode) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
-      Uri.parse('$baseUrl/login'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -144,7 +145,7 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl/loginCallback'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -172,7 +173,7 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
-      Uri.parse('$baseUrl/login'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -189,7 +190,7 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl/loginCallback'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -216,7 +217,7 @@ class EasyAuthApiClient {
   /// 刷新Token
   Future<String> refreshToken(String token) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/refreshToken'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.refreshToken}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': token}),
     );
@@ -228,7 +229,7 @@ class EasyAuthApiClient {
   /// 获取用户信息
   Future<UserInfo> getUserInfo(String token) async {
     final response = await _client.get(
-      Uri.parse('$baseUrl/getUserInfo?token=$token'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.getUserInfo}?token=$token'),
       headers: {'Content-Type': 'application/json'},
     );
 
@@ -239,7 +240,7 @@ class EasyAuthApiClient {
   /// 登出
   Future<void> logout(String token) async {
     final response = await _client.post(
-      Uri.parse('$baseUrl/logout?token=$token'),
+      Uri.parse('$baseUrl${EasyAuthApiPaths.logout}?token=$token'),
       headers: {'Content-Type': 'application/json'},
     );
 
@@ -256,7 +257,9 @@ class EasyAuthApiClient {
 
       try {
         final response = await _client.get(
-          Uri.parse('$baseUrl/loginResult?temp_token=$tempToken'),
+          Uri.parse(
+            '$baseUrl${EasyAuthApiPaths.loginResult}?temp_token=$tempToken',
+          ),
           headers: {'Content-Type': 'application/json'},
         );
 

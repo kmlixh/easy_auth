@@ -58,11 +58,36 @@ void main() async {
 
 | 参数 | 类型 | 必填 | 说明 | 示例 |
 |------|------|------|------|------|
-| baseUrl | String | 是 | anylogin服务地址，**不要**带尾部斜杠 | `https://api.example.com` |
-| tenantId | String | 是 | 租户ID，需在anylogin后端配置 | `my_app` |
+| baseUrl | String | 是 | anylogin服务地址（包含 `/login` 路由前缀），**不要**带尾部斜杠 | `https://api.janyee.com/login` |
+| tenantId | String | 是 | 租户ID，需在anylogin后端配置 | `kiku_app` |
 | sceneId | String | 是 | 登录场景ID | `app_native`, `web_login` |
 | tokenExpiry | Duration | 否 | Token有效期（默认7天） | `Duration(days: 7)` |
 | enableAutoRefresh | bool | 否 | 是否自动刷新Token（默认true） | `true` |
+
+#### 路径配置说明
+
+**重要**: anylogin 服务使用 `/login` 作为路由组前缀，因此 `baseUrl` 必须包含此前缀。
+
+**正确配置示例**:
+```dart
+await EasyAuth().init(
+  EasyAuthConfig(
+    baseUrl: 'https://api.janyee.com/login',  // ✅ 正确：包含 /login 前缀
+    tenantId: 'kiku_app',
+    sceneId: 'app_native',
+  ),
+);
+```
+
+**错误配置示例**:
+```dart
+await EasyAuth().init(
+  EasyAuthConfig(
+    baseUrl: 'https://api.janyee.com',  // ❌ 错误：缺少 /login 前缀
+    // 这会导致请求 /getUserInfo 而不是 /login/userInfo，返回 404
+  ),
+);
+```
 
 #### 场景ID说明
 - `app_native`: App原生登录（推荐移动端使用）

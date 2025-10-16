@@ -33,9 +33,9 @@ void main() async {
   // 初始化EasyAuth
   await EasyAuth().init(
     EasyAuthConfig(
-      baseUrl: 'https://your-anylogin-server.com',
-      tenantId: 'your_tenant_id',
-      sceneId: 'app_native',
+      baseUrl: 'https://api.janyee.com/login',  // anylogin服务地址（包含 /login 路由前缀）
+      tenantId: 'kiku_app',                     // 租户ID
+      sceneId: 'app_native',                    // 登录场景
       enableAutoRefresh: true,
     ),
   );
@@ -186,13 +186,15 @@ await EasyAuth().logout();
 
 ### EasyAuthConfig 参数
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| baseUrl | String | 是 | anylogin后端服务地址 |
-| tenantId | String | 是 | 租户ID |
-| sceneId | String | 是 | 登录场景ID（如：app_native, web_login） |
-| tokenExpiry | Duration | 否 | Token有效期，默认7天 |
-| enableAutoRefresh | bool | 否 | 是否启用自动刷新，默认true |
+| 参数 | 类型 | 必填 | 说明 | 示例 |
+|------|------|------|------|------|
+| baseUrl | String | 是 | anylogin后端服务地址（包含`/login`前缀） | `https://api.janyee.com/login` |
+| tenantId | String | 是 | 租户ID | `kiku_app` |
+| sceneId | String | 是 | 登录场景ID | `app_native`, `web_login` |
+| tokenExpiry | Duration | 否 | Token有效期，默认7天 | `Duration(days: 7)` |
+| enableAutoRefresh | bool | 否 | 是否启用自动刷新，默认true | `true` |
+
+**注意**: `baseUrl` 必须包含 `/login` 路由前缀，因为 anylogin 服务的所有登录接口都在 `/login` 路由组下。
 
 ### 登录场景说明
 
