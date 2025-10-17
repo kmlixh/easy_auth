@@ -74,9 +74,18 @@ class EasyAuth {
 
   /// 发送短信验证码
   Future<void> sendSMSCode(String phoneNumber) async {
+    print('🔍 [EasyAuth.sendSMSCode] 开始发送验证码');
+    print('   _config: ${_config != null ? "已初始化" : "未初始化"}');
+    print('   _apiClient: ${_apiClient != null ? "已创建" : "未创建"}');
+    if (_config != null) {
+      print('   TenantID: ${_config!.tenantId}');
+      print('   BaseURL: ${_config!.baseUrl}');
+    }
+
     try {
       await apiClient.sendSMSCode(phoneNumber);
     } catch (e) {
+      print('❌ [EasyAuth.sendSMSCode] 发送失败: $e');
       throw auth_exception.VerificationCodeException(
         'Failed to send SMS code: $e',
       );
