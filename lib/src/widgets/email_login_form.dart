@@ -135,7 +135,7 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
     try {
       final result = await EasyAuth().loginWithEmail(
         email: _emailController.text,
-        code: _codeController.text,
+        verificationCode: _codeController.text,
       );
 
       if (result.isSuccess) {
@@ -286,13 +286,13 @@ class _EmailLoginFormState extends State<EmailLoginForm> {
                         counterText: '',
                       ),
                   keyboardType: TextInputType.number,
-                  maxLength: 6,
+                  maxLength: 4,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return '请输入验证码';
                     }
-                    if (value.length != 6) {
-                      return '验证码为6位数字';
+                    if (value.length != 4) {
+                      return '验证码为4位数字';
                     }
                     return null;
                   },

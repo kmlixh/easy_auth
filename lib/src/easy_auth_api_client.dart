@@ -303,60 +303,6 @@ class EasyAuthApiClient {
     return TenantConfig.fromJson(data);
   }
 
-  /// 轮询登录结果
-  Future<LoginResult> _pollLoginResult(String tempToken) async {
-    const maxAttempts = 30; // 最多尝试30次
-    const pollInterval = Duration(seconds: 1); // 每秒轮询一次
-
-    for (var i = 0; i < maxAttempts; i++) {
-      await Future.delayed(pollInterval);
-
-      try {
-        final response = await _client.get(
-          Uri.parse(
-            '$baseUrl${EasyAuthApiPaths.loginResult}?temp_token=$tempToken',
-          ),
-          headers: {'Content-Type': 'application/json'},
-        );
-
-        final data = _handleResponse(response);
-        final status = data['status'] as String?;
-
-        if (status == 'success') {
-          final token = data['token'] as String?;
-          final userInfo = data['user_info'] as Map<String, dynamic>?;
-
-          if (token == null) {
-            throw EasyAuthException('No token in login result');
-          }
-
-          return LoginResult(
-            status: LoginStatus.success,
-            token: token,
-            userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
-          );
-        } else if (status == 'pending') {
-          // 继续轮询
-          continue;
-        } else if (status == 'failed') {
-          final message = data['message'] as String? ?? 'Login failed';
-          return LoginResult(status: LoginStatus.failed, message: message);
-        }
-      } catch (e) {
-        // 轮询过程中的错误，继续尝试
-        if (i == maxAttempts - 1) {
-          rethrow;
-        }
-      }
-    }
-
-    // 超时
-    return LoginResult(
-      status: LoginStatus.timeout,
-      message: 'Login polling timeout',
-    );
-  }
-
   /// 处理HTTP响应
   Map<String, dynamic> _handleResponse(http.Response response) {
     // 尝试解析JSON响应
