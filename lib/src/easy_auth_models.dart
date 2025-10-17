@@ -154,6 +154,7 @@ enum LoginChannel {
   }
 }
 
+<<<<<<< HEAD
 /// 租户配置
 class TenantConfig {
   final String tenantId;
@@ -199,18 +200,27 @@ class TenantConfig {
 
 /// 支持的渠道信息
 class SupportedChannelInfo {
+=======
+/// 支持的登录渠道信息
+class SupportedChannel {
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
   final String channelId;
   final String channelName;
   final String channelTitle;
   final int sortOrder;
 
+<<<<<<< HEAD
   SupportedChannelInfo({
+=======
+  SupportedChannel({
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
     required this.channelId,
     required this.channelName,
     required this.channelTitle,
     required this.sortOrder,
   });
 
+<<<<<<< HEAD
   factory SupportedChannelInfo.fromJson(Map<String, dynamic> json) {
     return SupportedChannelInfo(
       channelId: json['channel_id'] as String? ?? '',
@@ -227,5 +237,46 @@ class SupportedChannelInfo {
       'channel_title': channelTitle,
       'sort_order': sortOrder,
     };
+=======
+  factory SupportedChannel.fromJson(Map<String, dynamic> json) {
+    return SupportedChannel(
+      channelId: json['channel_id'] as String,
+      channelName: json['channel_name'] as String,
+      channelTitle: json['channel_title'] as String,
+      sortOrder: json['sort_order'] as int,
+    );
+  }
+}
+
+/// 租户配置信息
+class TenantConfig {
+  final String tenantId;
+  final String tenantName;
+  final String? icon;
+  final List<SupportedChannel> supportedChannels;
+  final String defaultChannel;
+
+  TenantConfig({
+    required this.tenantId,
+    required this.tenantName,
+    this.icon,
+    required this.supportedChannels,
+    required this.defaultChannel,
+  });
+
+  factory TenantConfig.fromJson(Map<String, dynamic> json) {
+    final channelsJson = json['supported_channels'] as List<dynamic>? ?? [];
+    final channels = channelsJson
+        .map((ch) => SupportedChannel.fromJson(ch as Map<String, dynamic>))
+        .toList();
+
+    return TenantConfig(
+      tenantId: json['tenant_id'] as String,
+      tenantName: json['tenant_name'] as String,
+      icon: json['icon'] as String?,
+      supportedChannels: channels,
+      defaultChannel: json['default_channel'] as String? ?? '',
+    );
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
   }
 }

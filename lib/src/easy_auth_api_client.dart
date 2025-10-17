@@ -24,7 +24,11 @@ class EasyAuthApiClient {
   /// 发送短信验证码
   Future<void> sendSMSCode(String phoneNumber) async {
     final response = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.sendSMSCode}'),
+=======
+      Uri.parse('$baseUrl/user/sendSMSCode'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'tenant_id': tenantId, 'phone_number': phoneNumber}),
     );
@@ -35,7 +39,11 @@ class EasyAuthApiClient {
   /// 发送邮箱验证码
   Future<void> sendEmailCode(String email) async {
     final response = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.sendEmailCode}'),
+=======
+      Uri.parse('$baseUrl/user/sendEmailCode'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'tenant_id': tenantId, 'email': email}),
     );
@@ -50,7 +58,11 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+=======
+      Uri.parse('$baseUrl/user/login'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -64,7 +76,11 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
+=======
+      Uri.parse('$baseUrl/user/loginCallback'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -92,7 +108,11 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+=======
+      Uri.parse('$baseUrl/user/login'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -106,7 +126,11 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
+=======
+      Uri.parse('$baseUrl/user/loginCallback'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -131,7 +155,11 @@ class EasyAuthApiClient {
   Future<LoginResult> loginWithWechat(String authCode) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+=======
+      Uri.parse('$baseUrl/user/login'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -145,7 +173,11 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
+=======
+      Uri.parse('$baseUrl/user/loginCallback'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -173,7 +205,11 @@ class EasyAuthApiClient {
   }) async {
     // 1. 调用login接口
     final loginResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+=======
+      Uri.parse('$baseUrl/user/login'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -190,7 +226,11 @@ class EasyAuthApiClient {
 
     // 2. 调用loginCallback接口
     final callbackResponse = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
+=======
+      Uri.parse('$baseUrl/user/loginCallback'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -214,10 +254,62 @@ class EasyAuthApiClient {
     return await _pollLoginResult(tempToken);
   }
 
+  /// Google登录（需要先通过原生SDK获取authCode）
+  Future<LoginResult> loginWithGoogle({
+    required String authCode,
+    String? idToken,
+  }) async {
+    // 1. 调用login接口
+    final loginResponse = await _client.post(
+      Uri.parse('$baseUrl/user/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': 'google',
+        'channel_data': {
+          'code': authCode,
+          if (idToken != null) 'id_token': idToken,
+        },
+      }),
+    );
+
+    _handleResponse(loginResponse);
+
+    // 2. 调用loginCallback接口
+    final callbackResponse = await _client.post(
+      Uri.parse('$baseUrl/user/loginCallback'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': 'google',
+        'channel_data': {
+          'code': authCode,
+          if (idToken != null) 'id_token': idToken,
+        },
+      }),
+    );
+
+    final callbackData = _handleResponse(callbackResponse);
+    final tempToken = callbackData['temp_token'] as String?;
+
+    if (tempToken == null) {
+      throw EasyAuthException('No temp_token received');
+    }
+
+    // 3. 轮询loginResult获取最终token
+    return await _pollLoginResult(tempToken);
+  }
+
   /// 刷新Token
   Future<String> refreshToken(String token) async {
     final response = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.refreshToken}'),
+=======
+      Uri.parse('$baseUrl/user/refreshToken'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': token}),
     );
@@ -229,7 +321,11 @@ class EasyAuthApiClient {
   /// 获取用户信息
   Future<UserInfo> getUserInfo(String token) async {
     final response = await _client.get(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.getUserInfo}?token=$token'),
+=======
+      Uri.parse('$baseUrl/user/getUserInfo?token=$token'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
     );
 
@@ -240,11 +336,33 @@ class EasyAuthApiClient {
   /// 登出
   Future<void> logout(String token) async {
     final response = await _client.post(
+<<<<<<< HEAD
       Uri.parse('$baseUrl${EasyAuthApiPaths.logout}?token=$token'),
+=======
+      Uri.parse('$baseUrl/user/logout?token=$token'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       headers: {'Content-Type': 'application/json'},
     );
 
     _handleResponse(response);
+  }
+
+  /// 获取租户配置（可用的登录渠道）
+  Future<TenantConfig> getTenantConfig() async {
+    final url = '$baseUrl/user/login/getTenantConfig?tenant_id=$tenantId';
+    print('🌐 [getTenantConfig] URL: $url');
+    print('🌐 [getTenantConfig] TenantID: $tenantId');
+    
+    final response = await _client.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    print('🌐 [getTenantConfig] Status: ${response.statusCode}');
+    print('🌐 [getTenantConfig] Response: ${response.body}');
+
+    final data = _handleResponse(response);
+    return TenantConfig.fromJson(data);
   }
 
   /// 轮询登录结果
@@ -257,9 +375,13 @@ class EasyAuthApiClient {
 
       try {
         final response = await _client.get(
+<<<<<<< HEAD
           Uri.parse(
             '$baseUrl${EasyAuthApiPaths.loginResult}?temp_token=$tempToken',
           ),
+=======
+          Uri.parse('$baseUrl/user/loginResult?temp_token=$tempToken'),
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
           headers: {'Content-Type': 'application/json'},
         );
 

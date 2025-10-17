@@ -234,6 +234,56 @@ class EasyAuth {
     }
   }
 
+  /// Google登录
+  Future<LoginResult> loginWithGoogle() async {
+    try {
+      // 1. 调用原生SDK获取授权信息
+      final result = await _channel.invokeMethod<Map>('googleLogin');
+
+      if (result == null) {
+        throw auth_exception.PlatformException(
+          'Google login result is null',
+          platform: 'google',
+        );
+      }
+
+      final authCode = result['authCode'] as String?;
+      final idToken = result['idToken'] as String?;
+
+      if (authCode == null || authCode.isEmpty) {
+        throw auth_exception.PlatformException(
+          'Google auth code is null or empty',
+          platform: 'google',
+        );
+      }
+
+      // 2. 使用授权码登录
+      final loginResult = await apiClient.loginWithGoogle(
+        authCode: authCode,
+        idToken: idToken,
+      );
+
+      if (loginResult.isSuccess && loginResult.token != null) {
+        await _saveSession(loginResult.token!, loginResult.userInfo);
+        _startAutoRefresh();
+      }
+
+      return loginResult;
+    } on auth_exception.PlatformException catch (e) {
+      throw auth_exception.PlatformException(
+        'Google login failed: ${e.message}',
+        platform: 'google',
+        originalError: e,
+      );
+    } catch (e, stackTrace) {
+      throw auth_exception.AuthenticationException(
+        'Google login failed: $e',
+        originalError: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   // ========================================
   // Token和用户信息管理
   // ========================================

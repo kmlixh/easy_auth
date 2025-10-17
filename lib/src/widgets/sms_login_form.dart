@@ -21,6 +21,9 @@ class SMSLoginForm extends StatefulWidget {
   /// 倒计时秒数
   final int countdownSeconds;
 
+  /// 主题色
+  final Color? primaryColor;
+
   const SMSLoginForm({
     super.key,
     this.onLoginSuccess,
@@ -30,6 +33,7 @@ class SMSLoginForm extends StatefulWidget {
     this.sendButtonStyle,
     this.loginButtonStyle,
     this.countdownSeconds = 60,
+    this.primaryColor,
   });
 
   @override
@@ -175,6 +179,9 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = widget.primaryColor ?? theme.primaryColor;
+
     return Form(
       key: _formKey,
       child: Column(
@@ -185,11 +192,34 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
             controller: _phoneController,
             decoration:
                 widget.phoneDecoration ??
-                const InputDecoration(
+                InputDecoration(
                   labelText: '手机号',
                   hintText: '请输入手机号',
-                  prefixIcon: Icon(Icons.phone),
-                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone, color: primaryColor),
+                  filled: true,
+                  fillColor: theme.brightness == Brightness.dark
+                      ? Colors.grey[850]
+                      : Colors.grey[100],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 2),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                 ),
             keyboardType: TextInputType.phone,
             validator: (value) {
@@ -207,17 +237,48 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
 
           // 验证码输入
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: TextFormField(
                   controller: _codeController,
                   decoration:
                       widget.codeDecoration ??
-                      const InputDecoration(
+                      InputDecoration(
                         labelText: '验证码',
                         hintText: '请输入验证码',
-                        prefixIcon: Icon(Icons.lock),
-                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(
+                          Icons.lock_outline,
+                          color: primaryColor,
+                        ),
+                        filled: true,
+                        fillColor: theme.brightness == Brightness.dark
+                            ? Colors.grey[850]
+                            : Colors.grey[100],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: primaryColor, width: 2),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        counterText: '',
                       ),
                   keyboardType: TextInputType.number,
                   maxLength: 6,
@@ -234,37 +295,66 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
               ),
               const SizedBox(width: 12),
               SizedBox(
-                width: 120,
-                height: 48,
+                width: 110,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _countdown > 0 || _loading ? null : _sendCode,
-                  style: widget.sendButtonStyle,
+                  style:
+                      widget.sendButtonStyle ??
+                      ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor.withOpacity(0.1),
+                        foregroundColor: primaryColor,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
                   child: _countdown > 0
-                      ? Text('$_countdown秒')
-                      : const Text('发送验证码'),
+                      ? Text(
+                          '$_countdown秒',
+                          style: const TextStyle(fontSize: 13),
+                        )
+                      : const Text('发送验证码', style: TextStyle(fontSize: 13)),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
           // 登录按钮
           SizedBox(
-            height: 48,
+            height: 52,
             child: ElevatedButton(
               onPressed: _loading ? null : _login,
-              style: widget.loginButtonStyle,
+              style:
+                  widget.loginButtonStyle ??
+                  ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(26),
+                    ),
+                    shadowColor: primaryColor.withOpacity(0.3),
+                  ),
               child: _loading
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 22,
+                      height: 22,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2,
+                        strokeWidth: 2.5,
                         color: Colors.white,
                       ),
                     )
-                  : const Text('登录', style: TextStyle(fontSize: 16)),
+                  : const Text(
+                      '登录',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],

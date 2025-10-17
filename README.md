@@ -33,9 +33,15 @@ void main() async {
   // 初始化EasyAuth
   await EasyAuth().init(
     EasyAuthConfig(
+<<<<<<< HEAD
       baseUrl: 'https://api.janyee.com/login',  // anylogin服务地址（包含 /login 路由前缀）
       tenantId: 'kiku_app',                     // 租户ID
       sceneId: 'app_native',                    // 登录场景
+=======
+      baseUrl: 'https://api.janyee.com',  // anylogin 后端地址（不需要 /user 后缀）
+      tenantId: 'your_tenant_id',
+      sceneId: 'app_native',
+>>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
       enableAutoRefresh: true,
     ),
   );
