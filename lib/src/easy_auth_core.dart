@@ -285,7 +285,7 @@ class EasyAuth {
   /// 登出
   Future<void> logout() async {
     try {
-      if (_currentToken != null) {
+    if (_currentToken != null) {
         await apiClient.logout(_currentToken!);
       }
     } catch (e) {
@@ -305,7 +305,7 @@ class EasyAuth {
       await _saveToken(newToken);
     } catch (e) {
       print('Token refresh failed: $e');
-      await _clearSession();
+    await _clearSession();
     }
   }
 
