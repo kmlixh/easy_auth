@@ -5,10 +5,15 @@
 /// anylogin 内部使用 /login 路由组
 /// 所以最终路径是 /user/login/xxx
 class EasyAuthApiPaths {
-  // 登录相关接口
+  // 新的一次性登录接口（推荐使用）
+  static const String directLogin = '/user/login/directLogin';
+
+  // 旧的多步登录接口（已废弃，保留兼容）
   static const String login = '/user/login/login';
   static const String loginCallback = '/user/login/loginCallback';
   static const String loginResult = '/user/login/loginResult';
+
+  // 用户管理接口
   static const String logout = '/user/login/logout';
   static const String getUserInfo = '/user/login/getUserInfo';
   static const String refreshToken = '/user/login/refreshToken';

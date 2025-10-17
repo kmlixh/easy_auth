@@ -57,14 +57,16 @@ class EasyAuthApiClient {
     _handleResponse(response);
   }
 
-  /// 短信验证码登录
+  /// 短信验证码登录（一次性完成）
   Future<LoginResult> loginWithSMS({
     required String phoneNumber,
     required String code,
   }) async {
-    // 1. 调用login接口
-    final loginResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+    print('📤 [loginWithSMS] 一次性登录');
+    print('   Phone: $phoneNumber');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -74,39 +76,35 @@ class EasyAuthApiClient {
       }),
     );
 
-    _handleResponse(loginResponse);
+    print('📥 [loginWithSMS] Status: ${response.statusCode}');
+    print('📥 [loginWithSMS] Response: ${response.body}');
 
-    // 2. 调用loginCallback接口
-    final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'tenant_id': tenantId,
-        'scene_id': sceneId,
-        'channel_id': 'sms',
-        'channel_data': {'phone': phoneNumber, 'code': code},
-      }),
-    );
+    final data = _handleResponse(response);
 
-    final callbackData = _handleResponse(callbackResponse);
-    final tempToken = callbackData['temp_token'] as String?;
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
 
-    if (tempToken == null) {
-      throw EasyAuthException('No temp_token received');
+    if (token == null) {
+      throw EasyAuthException('No token received');
     }
 
-    // 3. 轮询loginResult获取最终token
-    return await _pollLoginResult(tempToken);
+    return LoginResult(
+      isSuccess: true,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
   }
 
-  /// 邮箱验证码登录
+  /// 邮箱验证码登录（一次性完成）
   Future<LoginResult> loginWithEmail({
     required String email,
     required String code,
   }) async {
-    // 1. 调用login接口
-    final loginResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+    print('📤 [loginWithEmail] 一次性登录');
+    print('   Email: $email');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -116,36 +114,33 @@ class EasyAuthApiClient {
       }),
     );
 
-    _handleResponse(loginResponse);
+    print('📥 [loginWithEmail] Status: ${response.statusCode}');
+    print('📥 [loginWithEmail] Response: ${response.body}');
 
-    // 2. 调用loginCallback接口
-    final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'tenant_id': tenantId,
-        'scene_id': sceneId,
-        'channel_id': 'email',
-        'channel_data': {'email': email, 'code': code},
-      }),
-    );
+    final data = _handleResponse(response);
 
-    final callbackData = _handleResponse(callbackResponse);
-    final tempToken = callbackData['temp_token'] as String?;
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
 
-    if (tempToken == null) {
-      throw EasyAuthException('No temp_token received');
+    if (token == null) {
+      throw EasyAuthException('No token received');
     }
 
-    // 3. 轮询loginResult获取最终token
-    return await _pollLoginResult(tempToken);
+    return LoginResult(
+      isSuccess: true,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
   }
 
-  /// 微信登录（需要先通过原生SDK获取authCode）
+  /// 微信登录（一次性完成）
+  /// 需要先通过原生SDK获取authCode
   Future<LoginResult> loginWithWechat(String authCode) async {
-    // 1. 调用login接口
-    final loginResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+    print('📤 [loginWithWechat] 一次性登录');
+    print('   AuthCode: ${authCode.substring(0, 10)}...');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -155,39 +150,35 @@ class EasyAuthApiClient {
       }),
     );
 
-    _handleResponse(loginResponse);
+    print('📥 [loginWithWechat] Status: ${response.statusCode}');
+    print('📥 [loginWithWechat] Response: ${response.body}');
 
-    // 2. 调用loginCallback接口
-    final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'tenant_id': tenantId,
-        'scene_id': sceneId,
-        'channel_id': 'wechat',
-        'channel_data': {'code': authCode},
-      }),
-    );
+    final data = _handleResponse(response);
 
-    final callbackData = _handleResponse(callbackResponse);
-    final tempToken = callbackData['temp_token'] as String?;
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
 
-    if (tempToken == null) {
-      throw EasyAuthException('No temp_token received');
+    if (token == null) {
+      throw EasyAuthException('No token received');
     }
 
-    // 3. 轮询loginResult获取最终token
-    return await _pollLoginResult(tempToken);
+    return LoginResult(
+      isSuccess: true,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
   }
 
-  /// Apple ID登录（需要先通过原生SDK获取authCode）
+  /// Apple ID登录（一次性完成）
+  /// 需要先通过原生SDK获取authCode和idToken
   Future<LoginResult> loginWithApple({
     required String authCode,
     String? idToken,
   }) async {
-    // 1. 调用login接口
-    final loginResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+    print('📤 [loginWithApple] 一次性登录');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -200,42 +191,35 @@ class EasyAuthApiClient {
       }),
     );
 
-    _handleResponse(loginResponse);
+    print('📥 [loginWithApple] Status: ${response.statusCode}');
+    print('📥 [loginWithApple] Response: ${response.body}');
 
-    // 2. 调用loginCallback接口
-    final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'tenant_id': tenantId,
-        'scene_id': sceneId,
-        'channel_id': 'apple',
-        'channel_data': {
-          'code': authCode,
-          if (idToken != null) 'id_token': idToken,
-        },
-      }),
-    );
+    final data = _handleResponse(response);
 
-    final callbackData = _handleResponse(callbackResponse);
-    final tempToken = callbackData['temp_token'] as String?;
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
 
-    if (tempToken == null) {
-      throw EasyAuthException('No temp_token received');
+    if (token == null) {
+      throw EasyAuthException('No token received');
     }
 
-    // 3. 轮询loginResult获取最终token
-    return await _pollLoginResult(tempToken);
+    return LoginResult(
+      isSuccess: true,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
   }
 
-  /// Google登录（需要先通过原生SDK获取authCode）
+  /// Google登录（一次性完成）
+  /// 需要先通过原生SDK获取authCode
   Future<LoginResult> loginWithGoogle({
     required String authCode,
     String? idToken,
   }) async {
-    // 1. 调用login接口
-    final loginResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.login}'),
+    print('📤 [loginWithGoogle] 一次性登录');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'tenant_id': tenantId,
@@ -248,32 +232,23 @@ class EasyAuthApiClient {
       }),
     );
 
-    _handleResponse(loginResponse);
+    print('📥 [loginWithGoogle] Status: ${response.statusCode}');
+    print('📥 [loginWithGoogle] Response: ${response.body}');
 
-    // 2. 调用loginCallback接口
-    final callbackResponse = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.loginCallback}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'tenant_id': tenantId,
-        'scene_id': sceneId,
-        'channel_id': 'google',
-        'channel_data': {
-          'code': authCode,
-          if (idToken != null) 'id_token': idToken,
-        },
-      }),
-    );
+    final data = _handleResponse(response);
 
-    final callbackData = _handleResponse(callbackResponse);
-    final tempToken = callbackData['temp_token'] as String?;
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
 
-    if (tempToken == null) {
-      throw EasyAuthException('No temp_token received');
+    if (token == null) {
+      throw EasyAuthException('No token received');
     }
 
-    // 3. 轮询loginResult获取最终token
-    return await _pollLoginResult(tempToken);
+    return LoginResult(
+      isSuccess: true,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
   }
 
   /// 刷新Token
