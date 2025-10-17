@@ -124,6 +124,7 @@ enum LoginStatus {
 enum LoginChannel {
   wechat,
   apple,
+  google,
   sms,
   email;
 
@@ -133,6 +134,8 @@ enum LoginChannel {
         return 'wechat';
       case LoginChannel.apple:
         return 'apple';
+      case LoginChannel.google:
+        return 'google';
       case LoginChannel.sms:
         return 'sms';
       case LoginChannel.email:
@@ -146,6 +149,8 @@ enum LoginChannel {
         return '微信登录';
       case LoginChannel.apple:
         return 'Apple ID登录';
+      case LoginChannel.google:
+        return 'Google登录';
       case LoginChannel.sms:
         return '短信验证码登录';
       case LoginChannel.email:
@@ -154,73 +159,20 @@ enum LoginChannel {
   }
 }
 
-<<<<<<< HEAD
-/// 租户配置
-class TenantConfig {
-  final String tenantId;
-  final String tenantName;
-  final String icon;
-  final List<SupportedChannelInfo> supportedChannels;
-  final String? defaultChannel;
-
-  TenantConfig({
-    required this.tenantId,
-    required this.tenantName,
-    required this.icon,
-    required this.supportedChannels,
-    this.defaultChannel,
-  });
-
-  factory TenantConfig.fromJson(Map<String, dynamic> json) {
-    return TenantConfig(
-      tenantId: json['tenant_id'] as String? ?? '',
-      tenantName: json['tenant_name'] as String? ?? '',
-      icon: json['icon'] as String? ?? '',
-      supportedChannels:
-          (json['supported_channels'] as List<dynamic>?)
-              ?.map(
-                (e) => SupportedChannelInfo.fromJson(e as Map<String, dynamic>),
-              )
-              .toList() ??
-          [],
-      defaultChannel: json['default_channel'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'tenant_id': tenantId,
-      'tenant_name': tenantName,
-      'icon': icon,
-      'supported_channels': supportedChannels.map((e) => e.toJson()).toList(),
-      'default_channel': defaultChannel,
-    };
-  }
-}
-
-/// 支持的渠道信息
-class SupportedChannelInfo {
-=======
 /// 支持的登录渠道信息
-class SupportedChannel {
->>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
+class SupportedChannelInfo {
   final String channelId;
   final String channelName;
   final String channelTitle;
   final int sortOrder;
 
-<<<<<<< HEAD
   SupportedChannelInfo({
-=======
-  SupportedChannel({
->>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
     required this.channelId,
     required this.channelName,
     required this.channelTitle,
     required this.sortOrder,
   });
 
-<<<<<<< HEAD
   factory SupportedChannelInfo.fromJson(Map<String, dynamic> json) {
     return SupportedChannelInfo(
       channelId: json['channel_id'] as String? ?? '',
@@ -237,14 +189,6 @@ class SupportedChannel {
       'channel_title': channelTitle,
       'sort_order': sortOrder,
     };
-=======
-  factory SupportedChannel.fromJson(Map<String, dynamic> json) {
-    return SupportedChannel(
-      channelId: json['channel_id'] as String,
-      channelName: json['channel_name'] as String,
-      channelTitle: json['channel_title'] as String,
-      sortOrder: json['sort_order'] as int,
-    );
   }
 }
 
@@ -253,30 +197,39 @@ class TenantConfig {
   final String tenantId;
   final String tenantName;
   final String? icon;
-  final List<SupportedChannel> supportedChannels;
-  final String defaultChannel;
+  final List<SupportedChannelInfo> supportedChannels;
+  final String? defaultChannel;
 
   TenantConfig({
     required this.tenantId,
     required this.tenantName,
     this.icon,
     required this.supportedChannels,
-    required this.defaultChannel,
+    this.defaultChannel,
   });
 
   factory TenantConfig.fromJson(Map<String, dynamic> json) {
     final channelsJson = json['supported_channels'] as List<dynamic>? ?? [];
     final channels = channelsJson
-        .map((ch) => SupportedChannel.fromJson(ch as Map<String, dynamic>))
+        .map((ch) => SupportedChannelInfo.fromJson(ch as Map<String, dynamic>))
         .toList();
 
     return TenantConfig(
-      tenantId: json['tenant_id'] as String,
-      tenantName: json['tenant_name'] as String,
+      tenantId: json['tenant_id'] as String? ?? '',
+      tenantName: json['tenant_name'] as String? ?? '',
       icon: json['icon'] as String?,
       supportedChannels: channels,
-      defaultChannel: json['default_channel'] as String? ?? '',
+      defaultChannel: json['default_channel'] as String?,
     );
->>>>>>> efb743a6f6af6f26f5a8c0d6c41673638eb0a651
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tenant_id': tenantId,
+      'tenant_name': tenantName,
+      if (icon != null) 'icon': icon,
+      'supported_channels': supportedChannels.map((e) => e.toJson()).toList(),
+      if (defaultChannel != null) 'default_channel': defaultChannel,
+    };
   }
 }

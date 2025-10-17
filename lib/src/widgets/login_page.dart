@@ -33,14 +33,13 @@ class EasyAuthLoginPage extends StatefulWidget {
 
 class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   int _selectedTabIndex = 0;
-  TenantConfig? _tenantConfig;
   bool _loading = true;
 
   // 验证码登录渠道（短信、邮箱）
-  List<SupportedChannel> _verificationChannels = [];
+  List<SupportedChannelInfo> _verificationChannels = [];
 
   // 第三方登录渠道（微信、Apple、Google）
-  List<SupportedChannel> _thirdPartyChannels = [];
+  List<SupportedChannelInfo> _thirdPartyChannels = [];
 
   @override
   void initState() {
@@ -52,8 +51,6 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
     try {
       final config = await EasyAuth().apiClient.getTenantConfig();
       setState(() {
-        _tenantConfig = config;
-
         // 分类渠道
         _verificationChannels = config.supportedChannels
             .where((ch) => ch.channelId == 'sms' || ch.channelId == 'email')

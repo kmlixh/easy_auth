@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../easy_auth_core.dart';
 import '../easy_auth_models.dart';
-import '../easy_auth_exception.dart' as auth_exception;
 import 'sms_login_form.dart';
 import 'email_login_form.dart';
 import 'enhanced_third_party_login_buttons.dart';
@@ -82,9 +81,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
 
       // 2. 获取租户配置
       print('📡 获取租户配置...');
-      final config = await EasyAuth().apiClient.getTenantConfig(
-        widget.tenantId,
-      );
+      final config = await EasyAuth().apiClient.getTenantConfig();
 
       print('✅ 租户配置加载成功');
       print('   租户名称: ${config.tenantName}');
