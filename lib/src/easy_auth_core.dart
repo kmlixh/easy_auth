@@ -17,6 +17,10 @@ class EasyAuth {
   String? _currentToken;
   Timer? _refreshTimer;
 
+  // 第三方登录回调（由宿主应用设置）
+  Future<Map<String, dynamic>?> Function()? _googleLoginCallback;
+  Future<Map<String, dynamic>?> Function()? _appleLoginCallback;
+
   static final EasyAuth _instance = EasyAuth._internal();
   factory EasyAuth() => _instance;
   EasyAuth._internal();
@@ -194,9 +198,39 @@ class EasyAuth {
   }
 
   /// Apple ID登录
+  ///
+  /// 使用宿主应用提供的Apple登录回调
+  /// 如果未设置回调，尝试使用原生平台通道（旧方式）
   Future<LoginResult> loginWithApple() async {
     try {
-      // 1. 调用原生SDK获取授权信息
+      // 优先使用回调方式（推荐）
+      if (_appleLoginCallback != null) {
+        print('🍎 使用宿主应用的 Apple 登录回调');
+        final result = await _appleLoginCallback!();
+
+        if (result == null) {
+          throw auth_exception.PlatformException(
+            'User cancelled Apple login',
+            platform: 'apple',
+          );
+        }
+
+        // 使用 idToken 登录
+        final loginResult = await apiClient.loginWithApple(
+          authCode: result['authCode'] ?? '',
+          idToken: result['idToken'],
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+          _startAutoRefresh();
+        }
+
+        return loginResult;
+      }
+
+      // 回退到原生平台通道方式
+      print('🍎 使用原生平台通道进行 Apple 登录');
       final result = await _channel.invokeMethod<Map>('appleLogin');
 
       if (result == null) {
@@ -209,16 +243,16 @@ class EasyAuth {
       final authCode = result['authCode'] as String?;
       final idToken = result['idToken'] as String?;
 
-      if (authCode == null || authCode.isEmpty) {
+      if (idToken == null || idToken.isEmpty) {
         throw auth_exception.PlatformException(
-          'Apple auth code is null or empty',
+          'Apple idToken is null or empty',
           platform: 'apple',
         );
       }
 
-      // 2. 使用授权码登录
+      // 2. 使用 idToken 登录
       final loginResult = await apiClient.loginWithApple(
-        authCode: authCode,
+        authCode: authCode ?? '',
         idToken: idToken,
       );
 
@@ -244,9 +278,39 @@ class EasyAuth {
   }
 
   /// Google登录
+  ///
+  /// 使用宿主应用提供的Google登录回调
+  /// 如果未设置回调，尝试使用原生平台通道（旧方式）
   Future<LoginResult> loginWithGoogle() async {
     try {
-      // 1. 调用原生SDK获取授权信息
+      // 优先使用回调方式（推荐）
+      if (_googleLoginCallback != null) {
+        print('📱 使用宿主应用的 Google 登录回调');
+        final result = await _googleLoginCallback!();
+
+        if (result == null) {
+          throw auth_exception.PlatformException(
+            'User cancelled Google login',
+            platform: 'google',
+          );
+        }
+
+        // 使用 idToken 登录
+        final loginResult = await apiClient.loginWithGoogle(
+          authCode: result['authCode'] ?? '',
+          idToken: result['idToken'],
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+          _startAutoRefresh();
+        }
+
+        return loginResult;
+      }
+
+      // 回退到原生平台通道方式
+      print('📱 使用原生平台通道进行 Google 登录');
       final result = await _channel.invokeMethod<Map>('googleLogin');
 
       if (result == null) {
@@ -259,16 +323,16 @@ class EasyAuth {
       final authCode = result['authCode'] as String?;
       final idToken = result['idToken'] as String?;
 
-      if (authCode == null || authCode.isEmpty) {
+      if (idToken == null || idToken.isEmpty) {
         throw auth_exception.PlatformException(
-          'Google auth code is null or empty',
+          'Google idToken is null or empty',
           platform: 'google',
         );
       }
 
-      // 2. 使用授权码登录
+      // 2. 使用 idToken 登录
       final loginResult = await apiClient.loginWithGoogle(
-        authCode: authCode,
+        authCode: authCode ?? '',
         idToken: idToken,
       );
 
@@ -458,5 +522,55 @@ class EasyAuth {
   void dispose() {
     _stopAutoRefresh();
     _apiClient?.close();
+  }
+
+  // ========================================
+  // 第三方登录回调设置（供宿主应用使用）
+  // ========================================
+
+  /// 设置 Google 登录回调
+  ///
+  /// 宿主应用应该调用此方法，提供 Google 登录的实现
+  /// 回调应返回包含 idToken 和可选 authCode 的 Map
+  ///
+  /// 示例：
+  /// ```dart
+  /// EasyAuth().setGoogleLoginCallback(() async {
+  ///   final result = await GoogleSignInService().signIn();
+  ///   if (result == null) return null;
+  ///   return {
+  ///     'idToken': result.idToken,
+  ///     'authCode': result.accessToken,
+  ///   };
+  /// });
+  /// ```
+  void setGoogleLoginCallback(
+    Future<Map<String, dynamic>?> Function() callback,
+  ) {
+    _googleLoginCallback = callback;
+    print('✅ Google登录回调已设置');
+  }
+
+  /// 设置 Apple 登录回调
+  ///
+  /// 宿主应用应该调用此方法，提供 Apple 登录的实现
+  /// 回调应返回包含 idToken 和 authCode 的 Map
+  ///
+  /// 示例：
+  /// ```dart
+  /// EasyAuth().setAppleLoginCallback(() async {
+  ///   final result = await AppleSignInService().signIn();
+  ///   if (result == null) return null;
+  ///   return {
+  ///     'idToken': result.idToken,
+  ///     'authCode': result.authCode,
+  ///   };
+  /// });
+  /// ```
+  void setAppleLoginCallback(
+    Future<Map<String, dynamic>?> Function() callback,
+  ) {
+    _appleLoginCallback = callback;
+    print('✅ Apple登录回调已设置');
   }
 }

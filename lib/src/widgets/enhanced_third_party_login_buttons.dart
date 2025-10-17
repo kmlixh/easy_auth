@@ -130,29 +130,39 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
     try {
       print('🔍 开始Google登录...');
 
-      // TODO: 调用 EasyAuth 的 Google 登录方法
-      // 目前 easy_auth 可能还没有实现，需要临时处理
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google登录功能开发中，请使用其他方式登录'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      // 调用 EasyAuth 的 Google 登录方法
+      // 注意：需要在宿主应用中实现 GoogleSignInService
+      final result = await EasyAuth().loginWithGoogle();
 
-      // 如果 easy_auth 已实现 Google 登录，使用以下代码：
-      // final result = await EasyAuth().loginWithGoogle();
-      // if (result.isSuccess) {
-      //   print('✅ Google登录成功');
-      //   if (context.mounted) {
-      //     ScaffoldMessenger.of(context).showSnackBar(
-      //       const SnackBar(
-      //         content: Text('Google登录成功'),
-      //         backgroundColor: Colors.green,
-      //       ),
-      //     );
-      //   }
-      //   onLoginSuccess?.call(result);
-      // }
+      if (result.isSuccess) {
+        print('✅ Google登录成功');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google登录成功'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        onLoginSuccess?.call(result);
+      }
+    } on auth_exception.PlatformException catch (e) {
+      print('❌ Google登录失败: ${e.message}');
+      if (context.mounted) {
+        String message = 'Google登录失败';
+        if (e.message.contains('UNAVAILABLE')) {
+          message = 'Google服务不可用';
+        } else if (e.message.contains('USER_CANCELLED')) {
+          message = '用户取消';
+        } else if (e.message.contains('SIGN_IN_FAILED')) {
+          message = '登录失败，请重试';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+      onLoginFailed?.call(e);
     } catch (e) {
       print('❌ Google登录异常: $e');
       if (context.mounted) {

@@ -89,7 +89,7 @@ class EasyAuthApiClient {
     }
 
     return LoginResult(
-      isSuccess: true,
+      status: LoginStatus.success,
       token: token,
       userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
     );
@@ -127,7 +127,7 @@ class EasyAuthApiClient {
     }
 
     return LoginResult(
-      isSuccess: true,
+      status: LoginStatus.success,
       token: token,
       userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
     );
@@ -163,7 +163,7 @@ class EasyAuthApiClient {
     }
 
     return LoginResult(
-      isSuccess: true,
+      status: LoginStatus.success,
       token: token,
       userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
     );
@@ -204,7 +204,7 @@ class EasyAuthApiClient {
     }
 
     return LoginResult(
-      isSuccess: true,
+      status: LoginStatus.success,
       token: token,
       userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
     );
@@ -245,7 +245,7 @@ class EasyAuthApiClient {
     }
 
     return LoginResult(
-      isSuccess: true,
+      status: LoginStatus.success,
       token: token,
       userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
     );
