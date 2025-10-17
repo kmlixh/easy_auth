@@ -23,22 +23,36 @@ class EasyAuthApiClient {
 
   /// 发送短信验证码
   Future<void> sendSMSCode(String phoneNumber) async {
+    print('📤 [sendSMSCode] URL: $baseUrl${EasyAuthApiPaths.sendSMSCode}');
+    print('📤 [sendSMSCode] TenantID: $tenantId');
+    print('📤 [sendSMSCode] Phone: $phoneNumber');
+
     final response = await _client.post(
       Uri.parse('$baseUrl${EasyAuthApiPaths.sendSMSCode}'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'tenant_id': tenantId, 'phone_number': phoneNumber}),
+      body: jsonEncode({'tenant_id': tenantId, 'phone': phoneNumber}),
     );
+
+    print('📥 [sendSMSCode] Status: ${response.statusCode}');
+    print('📥 [sendSMSCode] Response: ${response.body}');
 
     _handleResponse(response);
   }
 
   /// 发送邮箱验证码
   Future<void> sendEmailCode(String email) async {
+    print('📤 [sendEmailCode] URL: $baseUrl${EasyAuthApiPaths.sendEmailCode}');
+    print('📤 [sendEmailCode] TenantID: $tenantId');
+    print('📤 [sendEmailCode] Email: $email');
+
     final response = await _client.post(
       Uri.parse('$baseUrl${EasyAuthApiPaths.sendEmailCode}'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'tenant_id': tenantId, 'email': email}),
     );
+
+    print('📥 [sendEmailCode] Status: ${response.statusCode}');
+    print('📥 [sendEmailCode] Response: ${response.body}');
 
     _handleResponse(response);
   }
@@ -370,23 +384,37 @@ class EasyAuthApiClient {
 
   /// 处理HTTP响应
   Map<String, dynamic> _handleResponse(http.Response response) {
-    if (response.statusCode != 200) {
-      throw EasyAuthException(
-        'HTTP ${response.statusCode}: ${response.body}',
-        statusCode: response.statusCode,
-      );
+    // 尝试解析JSON响应
+    Map<String, dynamic>? json;
+    try {
+      json =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (e) {
+      // 如果不是JSON格式，使用原始body
+      if (response.statusCode != 200) {
+        throw EasyAuthException(
+          'HTTP ${response.statusCode}: ${response.body}',
+          statusCode: response.statusCode,
+        );
+      }
     }
 
-    final json =
-        jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-    final code = json['code'] as int?;
+    // 如果HTTP状态码不是200，尝试从JSON中提取错误信息
+    if (response.statusCode != 200) {
+      final msg = json?['msg'] as String? ?? response.body;
+      throw EasyAuthException(msg, statusCode: response.statusCode);
+    }
 
-    if (code != 200) {
-      final msg = json['msg'] as String? ?? 'Unknown error';
+    // HTTP 200，检查业务code
+    final code = json?['code'] as int?;
+
+    // 兼容 code: 0 和 code: 200 两种成功响应
+    if (code != 0 && code != 200) {
+      final msg = json?['msg'] as String? ?? 'Unknown error';
       throw EasyAuthException(msg, statusCode: code);
     }
 
-    return json['data'] as Map<String, dynamic>? ?? {};
+    return json?['data'] as Map<String, dynamic>? ?? {};
   }
 
   /// 关闭HTTP客户端
