@@ -31,7 +31,32 @@ class EasyAuth {
       tenantId: config.tenantId,
       sceneId: config.sceneId,
     );
+
+    // 获取租户配置并设置Google配置
+    await _loadTenantConfig();
+
     await _restoreSession();
+  }
+
+  /// 加载租户配置
+  Future<void> _loadTenantConfig() async {
+    try {
+      final tenantConfig = await apiClient.getTenantConfig();
+      if (tenantConfig.supportedChannels.isNotEmpty) {
+        // 查找Google渠道配置
+        for (final channel in tenantConfig.supportedChannels) {
+          if (channel.channelId == 'google' && channel.config != null) {
+            // 设置Google配置
+            final googleService = GoogleSignInService();
+            googleService.setGoogleConfig(channel.config!);
+            print('✅ Google配置已设置: ${channel.config}');
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      print('⚠️ 加载租户配置失败: $e');
+    }
   }
 
   /// 当前配置

@@ -161,20 +161,29 @@ class SupportedChannelInfo {
   final String channelName;
   final String channelTitle;
   final int sortOrder;
+  final Map<String, String>? config;
 
   SupportedChannelInfo({
     required this.channelId,
     required this.channelName,
     required this.channelTitle,
     required this.sortOrder,
+    this.config,
   });
 
   factory SupportedChannelInfo.fromJson(Map<String, dynamic> json) {
+    // 处理config字段
+    Map<String, String>? config;
+    if (json['config'] != null) {
+      config = Map<String, String>.from(json['config'] as Map);
+    }
+
     return SupportedChannelInfo(
       channelId: json['channel_id'] as String? ?? '',
       channelName: json['channel_name'] as String? ?? '',
       channelTitle: json['channel_title'] as String? ?? '',
       sortOrder: json['sort_order'] as int? ?? 0,
+      config: config,
     );
   }
 
@@ -184,6 +193,7 @@ class SupportedChannelInfo {
       'channel_name': channelName,
       'channel_title': channelTitle,
       'sort_order': sortOrder,
+      if (config != null) 'config': config,
     };
   }
 }

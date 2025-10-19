@@ -4,31 +4,58 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 /// Google登录服务类
 /// 处理不同平台的Google登录逻辑
-/// 注意：Client ID应该从后端API获取，不在此处硬编码
 class GoogleSignInService {
   static final GoogleSignInService _instance = GoogleSignInService._internal();
   factory GoogleSignInService() => _instance;
   GoogleSignInService._internal();
 
+  // 存储从服务器获取的Google配置
+  Map<String, String>? _googleConfig;
+
+  /// 设置Google配置（从服务器获取）
+  void setGoogleConfig(Map<String, String> config) {
+    _googleConfig = config;
+    print('🔑 Google配置已设置: $config');
+  }
+
   /// 根据平台获取Google Sign-In实例
-  /// 注意：Client ID应该从后端API获取，这里使用占位符
   GoogleSignIn _getGoogleSignInForPlatform() {
     final platform = getCurrentPlatform();
 
-    // TODO: 从后端API获取Client ID，而不是硬编码
-    // 这里应该调用租户配置API获取Google的Client ID配置
-    // 然后根据平台选择对应的Client ID
-
-    // 临时使用占位符（实际使用时需要从API获取）
-    String clientId = 'PLACEHOLDER_CLIENT_ID';
+    // 从配置中获取对应平台的Client ID
+    String clientId = _getClientIdForPlatform(platform);
 
     print('🔑 Google Sign-In配置 - 平台: $platform, Client ID: $clientId');
-    print('⚠️ 警告：当前使用占位符Client ID，需要从后端API获取真实配置');
 
     return GoogleSignIn(
       clientId: clientId,
       scopes: ['openid', 'profile', 'email'],
     );
+  }
+
+  /// 根据平台获取对应的Client ID
+  String _getClientIdForPlatform(String platform) {
+    if (_googleConfig == null) {
+      throw Exception('Google配置未初始化，请先调用setGoogleConfig()');
+    }
+
+    // 根据平台选择对应的Client ID
+    switch (platform) {
+      case 'android':
+        return _googleConfig!['android'] ?? '';
+      case 'ios':
+        return _googleConfig!['ios'] ?? '';
+      case 'web':
+        return _googleConfig!['web'] ?? '';
+      case 'desktop':
+      case 'macos':
+      case 'windows':
+      case 'linux':
+        return _googleConfig!['desktop'] ?? '';
+      default:
+        // 默认使用桌面端配置
+        return _googleConfig!['desktop'] ?? '';
+    }
   }
 
   /// 执行Google登录
