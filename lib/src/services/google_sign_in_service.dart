@@ -53,7 +53,14 @@ class GoogleSignInService {
       } else {
         // 非Web平台使用WebView登录服务
         final webService = WebGoogleLoginService();
-        return await webService.signIn(context);
+        final result = await webService.signIn(context);
+
+        if (result == null) {
+          print('❌ WebView登录被用户取消或失败');
+          return null;
+        }
+
+        return result;
       }
     } catch (e) {
       print('❌ Google登录失败: $e');

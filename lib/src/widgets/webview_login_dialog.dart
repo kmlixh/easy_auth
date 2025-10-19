@@ -77,6 +77,17 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       final uri = Uri.parse(url);
       final code = uri.queryParameters['code'];
       final state = uri.queryParameters['state'];
+      final error = uri.queryParameters['error'];
+
+      // 检查是否有错误
+      if (error != null) {
+        print('❌ Google OAuth错误: $error');
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        widget.onResult(null);
+        return;
+      }
 
       if (code != null) {
         print('✅ 获取到授权码: $code');
@@ -90,7 +101,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
         }
         widget.onResult(loginResult);
       } else {
-        print('❌ 未获取到授权码');
+        print('❌ 未获取到授权码，可能是用户取消了登录');
         if (mounted) {
           Navigator.of(context).pop();
         }
