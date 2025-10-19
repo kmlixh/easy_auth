@@ -176,21 +176,41 @@ class EasyAuth {
         );
       }
 
-      // 检测当前平台
-      final platform = _detectPlatform();
-      print('🔍 Google登录 - 检测到平台: $platform');
+      // 检查WebView是否返回了callback_url
+      if (result.containsKey('callbackUrl')) {
+        print('✅ WebView返回回调URL，调用后端登录接口');
 
-      final loginResult = await apiClient.loginWithGoogle(
-        authCode: result['authCode'] ?? '',
-        idToken: result['idToken'],
-        platform: platform, // 传递平台信息
-      );
+        // 使用callback_url调用后端登录接口
+        final callbackUrl = result['callbackUrl'] as String;
+        final platform = result['platform'] as String? ?? 'web';
 
-      if (loginResult.isSuccess && loginResult.token != null) {
-        await _saveSession(loginResult.token!, loginResult.userInfo);
+        final loginResult = await apiClient.loginWithGoogle(
+          callbackUrl: callbackUrl,
+          platform: platform,
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+        }
+
+        return loginResult;
+      } else {
+        // 传统方式：使用authCode和idToken调用API
+        final platform = _detectPlatform();
+        print('🔍 Google登录 - 检测到平台: $platform');
+
+        final loginResult = await apiClient.loginWithGoogle(
+          authCode: result['authCode'] ?? '',
+          idToken: result['idToken'],
+          platform: platform, // 传递平台信息
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+        }
+
+        return loginResult;
       }
-
-      return loginResult;
     } catch (e, stackTrace) {
       throw auth_exception.AuthenticationException(
         'Google login failed: $e',

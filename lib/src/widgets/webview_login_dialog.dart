@@ -48,9 +48,11 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             });
             print('✅ 页面加载完成: $url');
 
-            // 检查是否是回调页面
-            if (url.contains('/user/login/google/callback')) {
-              print('✅ 检测到回调URL，直接处理登录逻辑');
+            // 检查是否是完整的回调URL（必须以回调URL开头）
+            if (url.startsWith(
+              'https://api.janyee.com/user/login/google/callback',
+            )) {
+              print('✅ 检测到完整回调URL，直接处理登录逻辑');
               // 直接处理回调，不需要等待页面加载完成
               _handleCallback(url);
             }
@@ -58,9 +60,11 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
           onNavigationRequest: (NavigationRequest request) {
             print('🔍 导航请求: ${request.url}');
 
-            // 检查是否是回调URL
-            if (request.url.contains('/user/login/google/callback')) {
-              print('✅ 检测到回调URL，立即处理登录逻辑');
+            // 检查是否是完整的回调URL（必须以回调URL开头）
+            if (request.url.startsWith(
+              'https://api.janyee.com/user/login/google/callback',
+            )) {
+              print('✅ 检测到完整回调URL，立即处理登录逻辑');
               // 立即处理回调，不等待页面加载
               Future.delayed(const Duration(milliseconds: 100), () {
                 _handleCallback(request.url);
@@ -105,16 +109,16 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       if (code != null && code.isNotEmpty) {
         print('✅ 获取到授权码: $code');
 
-        // 调用后端API完成登录，传递完整的回调URL
-        final loginResult = await _completeLoginWithFullUrl(url);
+        // 直接返回回调URL，让EasyAuth调用后端API
+        final result = {'callbackUrl': url, 'platform': 'web'};
 
-        print('🔍 WebView登录结果: $loginResult');
+        print('🔍 WebView返回回调URL: $result');
 
         // 关闭对话框并返回结果
         if (mounted) {
           Navigator.of(context).pop();
         }
-        widget.onResult(loginResult);
+        widget.onResult(result);
       } else {
         print('❌ 未获取到授权码，可能是用户取消了登录');
         if (mounted) {

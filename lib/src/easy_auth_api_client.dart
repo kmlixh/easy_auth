@@ -213,11 +213,34 @@ class EasyAuthApiClient {
   /// Google登录（一次性完成，支持多平台）
   /// 需要先通过原生SDK获取authCode
   Future<LoginResult> loginWithGoogle({
-    required String authCode,
+    String? authCode,
     String? idToken,
     String? platform,
+    String? callbackUrl,
   }) async {
     print('📤 [loginWithGoogle] 一次性登录 - 平台: $platform');
+
+    // 构建channel_data
+    Map<String, dynamic> channelData = {};
+
+    if (callbackUrl != null) {
+      // 使用callback_url方式
+      channelData['callback_url'] = callbackUrl;
+      if (platform != null) {
+        channelData['platform'] = platform;
+      }
+    } else {
+      // 使用传统方式
+      if (authCode != null) {
+        channelData['code'] = authCode;
+      }
+      if (idToken != null) {
+        channelData['id_token'] = idToken;
+      }
+      if (platform != null) {
+        channelData['platform'] = platform;
+      }
+    }
 
     final response = await _client.post(
       Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
@@ -226,11 +249,7 @@ class EasyAuthApiClient {
         'tenant_id': tenantId,
         'scene_id': sceneId,
         'channel_id': 'google',
-        'channel_data': {
-          'code': authCode,
-          if (idToken != null) 'id_token': idToken,
-          if (platform != null) 'platform': platform,
-        },
+        'channel_data': channelData,
       }),
     );
 
