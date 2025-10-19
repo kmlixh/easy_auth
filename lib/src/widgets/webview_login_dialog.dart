@@ -47,17 +47,41 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
               _isLoading = false;
             });
             print('✅ 页面加载完成: $url');
+
+            // 检查是否是回调页面且包含code参数
+            if (url.contains('/user/login/google/callback') &&
+                url.contains('code=')) {
+              print('✅ 页面加载完成，检测到回调URL且包含code参数');
+              Future.delayed(const Duration(milliseconds: 200), () {
+                _handleCallback(url);
+              });
+            } else if (url.contains('/user/login/google/callback')) {
+              print('⚠️ 回调页面加载完成，但未检测到code参数，等待JavaScript处理...');
+              // 等待JavaScript处理，如果2秒后还没有处理，则检查URL
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) {
+                  _controller.currentUrl().then((currentUrl) {
+                    if (currentUrl != null && currentUrl.contains('code=')) {
+                      print('✅ 延迟检测到code参数');
+                      _handleCallback(currentUrl);
+                    } else {
+                      print('❌ 2秒后仍未检测到code参数，可能用户取消了登录');
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                      }
+                      widget.onResult(null);
+                    }
+                  });
+                }
+              });
+            }
           },
           onNavigationRequest: (NavigationRequest request) {
             print('🔍 导航请求: ${request.url}');
 
-            // 检查是否是回调URL
+            // 只检查是否是回调URL，不检查code参数（因为导航时可能还没有code）
             if (request.url.contains('/user/login/google/callback')) {
-              print('✅ 检测到回调URL，开始处理登录结果');
-              // 先允许导航，然后在页面加载完成后处理
-              Future.delayed(const Duration(milliseconds: 500), () {
-                _handleCallback(request.url);
-              });
+              print('✅ 检测到回调URL，允许导航');
               return NavigationDecision.navigate;
             }
 
