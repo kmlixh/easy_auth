@@ -122,8 +122,8 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       if (code != null && code.isNotEmpty) {
         print('✅ 获取到授权码: $code');
 
-        // 调用后端API完成登录
-        final loginResult = await _completeLogin(code, state);
+        // 调用后端API完成登录，传递完整的回调URL
+        final loginResult = await _completeLoginWithFullUrl(url);
 
         // 关闭对话框并返回结果
         if (mounted) {
@@ -143,6 +143,54 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
         Navigator.of(context).pop();
       }
       widget.onResult(null);
+    }
+  }
+
+  /// 调用后端API完成登录（传递完整回调URL）
+  Future<Map<String, dynamic>?> _completeLoginWithFullUrl(
+    String callbackUrl,
+  ) async {
+    try {
+      print('🔄 调用后端API完成登录，传递完整回调URL...');
+      print('🔗 回调URL: $callbackUrl');
+
+      final response = await http.post(
+        Uri.parse('https://api.janyee.com/user/login/directLogin'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'tenant_id': 'kiku_app',
+          'scene_id': 'app_native',
+          'channel_id': 'google',
+          'channel_data': {
+            'callback_url': callbackUrl, // 传递完整的回调URL
+            'platform': 'web',
+          },
+        }),
+      );
+
+      print('📥 后端响应: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['code'] == 0) {
+          print('✅ 后端登录成功');
+          return {
+            'callbackUrl': callbackUrl,
+            'platform': 'web',
+            'token': data['data']['token'],
+            'userInfo': data['data']['user_info'],
+          };
+        } else {
+          print('❌ 后端登录失败: ${data['msg']}');
+          return null;
+        }
+      } else {
+        print('❌ 后端请求失败: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ 调用后端API失败: $e');
+      return null;
     }
   }
 
