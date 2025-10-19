@@ -66,8 +66,8 @@ class VerificationCodeException extends EasyAuthException {
 
 /// Token过期错误
 class TokenExpiredException extends AuthenticationException {
-  TokenExpiredException([String message = 'Token has expired'])
-    : super(message, statusCode: 401);
+  TokenExpiredException([super.message = 'Token has expired'])
+    : super(statusCode: 401);
 
   @override
   String toString() => 'TokenExpiredException: $message';
@@ -105,8 +105,3 @@ class PlatformException extends EasyAuthException {
     return buffer.toString();
   }
 }
-
-
-
-
-

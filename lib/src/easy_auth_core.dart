@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'easy_auth_models.dart';
 import 'easy_auth_api_client.dart';
 import 'easy_auth_exception.dart' as auth_exception;
+import 'services/google_sign_in_service.dart';
 
 /// EasyAuth核心类 - 纯Flutter包
 /// 提供统一的登录、登出、Token管理功能
@@ -14,7 +16,6 @@ class EasyAuth {
   String? _currentToken;
 
   // 第三方登录回调（由宿主应用设置）
-  Future<Map<String, dynamic>?> Function()? _googleLoginCallback;
   Future<Map<String, dynamic>?> Function()? _appleLoginCallback;
   Future<Map<String, dynamic>?> Function()? _wechatLoginCallback;
 
@@ -146,17 +147,13 @@ class EasyAuth {
   // 第三方登录
   // ========================================
 
-  /// Google登录
+  /// Google登录（支持多平台）
   Future<LoginResult> loginWithGoogle() async {
     try {
-      if (_googleLoginCallback == null) {
-        throw auth_exception.PlatformException(
-          'Google login callback not set',
-          platform: 'google',
-        );
-      }
+      // 使用Google登录服务
+      final googleService = GoogleSignInService();
+      final result = await googleService.signIn();
 
-      final result = await _googleLoginCallback!();
       if (result == null) {
         throw auth_exception.PlatformException(
           'User cancelled',
@@ -164,9 +161,14 @@ class EasyAuth {
         );
       }
 
+      // 检测当前平台
+      final platform = _detectPlatform();
+      print('🔍 Google登录 - 检测到平台: $platform');
+
       final loginResult = await apiClient.loginWithGoogle(
         authCode: result['authCode'] ?? '',
         idToken: result['idToken'],
+        platform: platform, // 传递平台信息
       );
 
       if (loginResult.isSuccess && loginResult.token != null) {
@@ -181,6 +183,17 @@ class EasyAuth {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  /// 检测当前平台
+  String _detectPlatform() {
+    if (kIsWeb) {
+      return 'web';
+    }
+
+    // 使用GoogleSignInService的平台检测逻辑
+    final googleService = GoogleSignInService();
+    return googleService.getCurrentPlatform();
   }
 
   /// Apple登录
@@ -260,12 +273,6 @@ class EasyAuth {
   // 回调设置
   // ========================================
 
-  void setGoogleLoginCallback(
-    Future<Map<String, dynamic>?> Function() callback,
-  ) {
-    _googleLoginCallback = callback;
-  }
-
   void setAppleLoginCallback(
     Future<Map<String, dynamic>?> Function() callback,
   ) {
@@ -285,7 +292,7 @@ class EasyAuth {
   /// 登出
   Future<void> logout() async {
     try {
-    if (_currentToken != null) {
+      if (_currentToken != null) {
         await apiClient.logout(_currentToken!);
       }
     } catch (e) {
@@ -305,7 +312,7 @@ class EasyAuth {
       await _saveToken(newToken);
     } catch (e) {
       print('Token refresh failed: $e');
-    await _clearSession();
+      await _clearSession();
     }
   }
 

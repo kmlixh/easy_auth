@@ -1,7 +1,3 @@
-/// EasyAuth 数据模型定义
-///
-/// 定义登录、用户信息等核心数据结构
-
 /// 配置类
 class EasyAuthConfig {
   final String baseUrl;
