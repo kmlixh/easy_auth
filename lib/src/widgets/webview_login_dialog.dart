@@ -54,8 +54,11 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             // 检查是否是回调URL
             if (request.url.contains('/user/login/google/callback')) {
               print('✅ 检测到回调URL，开始处理登录结果');
-              _handleCallback(request.url);
-              return NavigationDecision.prevent;
+              // 先允许导航，然后在页面加载完成后处理
+              Future.delayed(const Duration(milliseconds: 500), () {
+                _handleCallback(request.url);
+              });
+              return NavigationDecision.navigate;
             }
 
             // 允许所有其他导航
@@ -74,10 +77,13 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
 
   void _handleCallback(String url) async {
     try {
+      print('🔍 处理回调URL: $url');
       final uri = Uri.parse(url);
       final code = uri.queryParameters['code'];
       final state = uri.queryParameters['state'];
       final error = uri.queryParameters['error'];
+
+      print('🔍 URL参数 - code: $code, state: $state, error: $error');
 
       // 检查是否有错误
       if (error != null) {
@@ -89,7 +95,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
         return;
       }
 
-      if (code != null) {
+      if (code != null && code.isNotEmpty) {
         print('✅ 获取到授权码: $code');
 
         // 调用后端API完成登录
