@@ -22,14 +22,15 @@ class GoogleSignInService {
   GoogleSignIn _getGoogleSignInForPlatform() {
     final platform = getCurrentPlatform();
 
-    // 从配置中获取对应平台的Client ID
-    String clientId = _getClientIdForPlatform(platform);
+    print('🔑 Google Sign-In配置 - 平台: $platform');
 
-    print('🔑 Google Sign-In配置 - 平台: $platform, Client ID: $clientId');
+    // 所有平台都使用Web方式登录
+    String clientId = _getClientIdForPlatform('web');
+    print('🔑 使用Web Client ID: $clientId');
 
     return GoogleSignIn(
       clientId: clientId,
-      scopes: ['openid', 'profile', 'email'],
+      scopes: ['openid'], // 只获取openid
     );
   }
 
@@ -47,10 +48,10 @@ class GoogleSignInService {
         return _googleConfig!['ios'] ?? '';
       case 'web':
         return _googleConfig!['web'] ?? '';
-      case 'desktop':
       case 'macos':
       case 'windows':
       case 'linux':
+      case 'desktop':
         return _googleConfig!['desktop'] ?? '';
       default:
         // 默认使用桌面端配置
