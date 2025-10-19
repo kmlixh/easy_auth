@@ -210,13 +210,14 @@ class EasyAuthApiClient {
     );
   }
 
-  /// Google登录（一次性完成）
+  /// Google登录（一次性完成，支持多平台）
   /// 需要先通过原生SDK获取authCode
   Future<LoginResult> loginWithGoogle({
     required String authCode,
     String? idToken,
+    String? platform,
   }) async {
-    print('📤 [loginWithGoogle] 一次性登录');
+    print('📤 [loginWithGoogle] 一次性登录 - 平台: $platform');
 
     final response = await _client.post(
       Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
@@ -228,6 +229,7 @@ class EasyAuthApiClient {
         'channel_data': {
           'code': authCode,
           if (idToken != null) 'id_token': idToken,
+          if (platform != null) 'platform': platform,
         },
       }),
     );
