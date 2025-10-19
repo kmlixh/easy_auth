@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'easy_auth_models.dart';
@@ -41,19 +42,8 @@ class EasyAuth {
   /// 加载租户配置
   Future<void> _loadTenantConfig() async {
     try {
-      final tenantConfig = await apiClient.getTenantConfig();
-      if (tenantConfig.supportedChannels.isNotEmpty) {
-        // 查找Google渠道配置
-        for (final channel in tenantConfig.supportedChannels) {
-          if (channel.channelId == 'google' && channel.config != null) {
-            // 设置Google配置
-            final googleService = GoogleSignInService();
-            googleService.setGoogleConfig(channel.config!);
-            print('✅ Google配置已设置: ${channel.config}');
-            break;
-          }
-        }
-      }
+      await apiClient.getTenantConfig();
+      // Google登录现在使用Web方式，不需要设置配置
     } catch (e) {
       print('⚠️ 加载租户配置失败: $e');
     }
@@ -173,11 +163,11 @@ class EasyAuth {
   // ========================================
 
   /// Google登录（支持多平台）
-  Future<LoginResult> loginWithGoogle() async {
+  Future<LoginResult> loginWithGoogle(BuildContext context) async {
     try {
       // 使用Google登录服务
       final googleService = GoogleSignInService();
-      final result = await googleService.signIn();
+      final result = await googleService.signIn(context);
 
       if (result == null) {
         throw auth_exception.PlatformException(

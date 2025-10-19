@@ -132,7 +132,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
 
       // 调用 EasyAuth 的 Google 登录方法
       // 注意：需要在宿主应用中实现 GoogleSignInService
-      final result = await EasyAuth().loginWithGoogle();
+      final result = await EasyAuth().loginWithGoogle(context);
 
       if (result.isSuccess) {
         print('✅ Google登录成功');

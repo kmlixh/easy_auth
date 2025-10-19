@@ -128,7 +128,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
   /// Google登录
   Future<void> _loginWithGoogle(BuildContext context) async {
     try {
-      final result = await EasyAuth().loginWithGoogle();
+      final result = await EasyAuth().loginWithGoogle(context);
 
       if (result.isSuccess) {
         if (context.mounted) {
