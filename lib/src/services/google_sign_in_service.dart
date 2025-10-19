@@ -55,6 +55,8 @@ class GoogleSignInService {
         final webService = WebGoogleLoginService();
         final result = await webService.signIn(context);
 
+        print('🔍 WebView登录服务返回结果: $result');
+
         if (result == null) {
           print('❌ WebView登录被用户取消或失败');
           return null;

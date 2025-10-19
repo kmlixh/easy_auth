@@ -48,40 +48,23 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             });
             print('✅ 页面加载完成: $url');
 
-            // 检查是否是回调页面且包含code参数
-            if (url.contains('/user/login/google/callback') &&
-                url.contains('code=')) {
-              print('✅ 页面加载完成，检测到回调URL且包含code参数');
-              Future.delayed(const Duration(milliseconds: 200), () {
-                _handleCallback(url);
-              });
-            } else if (url.contains('/user/login/google/callback')) {
-              print('⚠️ 回调页面加载完成，但未检测到code参数，等待JavaScript处理...');
-              // 等待JavaScript处理，如果2秒后还没有处理，则检查URL
-              Future.delayed(const Duration(seconds: 2), () {
-                if (mounted) {
-                  _controller.currentUrl().then((currentUrl) {
-                    if (currentUrl != null && currentUrl.contains('code=')) {
-                      print('✅ 延迟检测到code参数');
-                      _handleCallback(currentUrl);
-                    } else {
-                      print('❌ 2秒后仍未检测到code参数，可能用户取消了登录');
-                      if (mounted) {
-                        Navigator.of(context).pop();
-                      }
-                      widget.onResult(null);
-                    }
-                  });
-                }
-              });
+            // 检查是否是回调页面
+            if (url.contains('/user/login/google/callback')) {
+              print('✅ 检测到回调URL，直接处理登录逻辑');
+              // 直接处理回调，不需要等待页面加载完成
+              _handleCallback(url);
             }
           },
           onNavigationRequest: (NavigationRequest request) {
             print('🔍 导航请求: ${request.url}');
 
-            // 只检查是否是回调URL，不检查code参数（因为导航时可能还没有code）
+            // 检查是否是回调URL
             if (request.url.contains('/user/login/google/callback')) {
-              print('✅ 检测到回调URL，允许导航');
+              print('✅ 检测到回调URL，立即处理登录逻辑');
+              // 立即处理回调，不等待页面加载
+              Future.delayed(const Duration(milliseconds: 100), () {
+                _handleCallback(request.url);
+              });
               return NavigationDecision.navigate;
             }
 
@@ -124,6 +107,8 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
 
         // 调用后端API完成登录，传递完整的回调URL
         final loginResult = await _completeLoginWithFullUrl(url);
+
+        print('🔍 WebView登录结果: $loginResult');
 
         // 关闭对话框并返回结果
         if (mounted) {
@@ -172,14 +157,18 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['code'] == 0) {
+        print('🔍 后端响应数据: $data');
+        if (data['code'] == 200) {
+          // 修改为200，匹配后端响应
           print('✅ 后端登录成功');
-          return {
+          final result = {
             'callbackUrl': callbackUrl,
             'platform': 'web',
             'token': data['data']['token'],
             'userInfo': data['data']['user_info'],
           };
+          print('🔍 返回结果: $result');
+          return result;
         } else {
           print('❌ 后端登录失败: ${data['msg']}');
           return null;
