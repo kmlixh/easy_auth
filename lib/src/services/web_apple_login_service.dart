@@ -40,6 +40,7 @@ class WebAppleLoginService {
     String loginUrl,
   ) async {
     final completer = Completer<Map<String, dynamic>?>();
+    bool completed = false;
 
     // 显示WebView对话框
     showDialog(
@@ -50,7 +51,10 @@ class WebAppleLoginService {
           loginUrl: loginUrl,
           channelId: 'apple',
           onResult: (result) {
-            completer.complete(result);
+            if (!completed) {
+              completed = true;
+              completer.complete(result);
+            }
           },
         );
       },

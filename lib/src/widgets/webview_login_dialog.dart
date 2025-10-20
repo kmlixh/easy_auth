@@ -20,6 +20,7 @@ class WebViewLoginDialog extends StatefulWidget {
 
 class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   bool _isLoading = true;
+  bool _completed = false; // 防止重复调用onResult
 
   @override
   void initState() {
@@ -79,8 +80,14 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
                   const Spacer(),
                   IconButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      widget.onResult(null);
+                      // 关闭时也避免重复回调
+                      if (!_completed) {
+                        _completed = true;
+                        Navigator.of(context).pop();
+                        widget.onResult(null);
+                      } else {
+                        Navigator.of(context).pop();
+                      }
                     },
                     icon: const Icon(Icons.close, color: Colors.white),
                   ),
@@ -144,10 +151,10 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
                       if (url != null &&
                           url.toString().startsWith(callbackUrl)) {
                         print('✅ [导航响应] 检测到完整回调URL，立即处理登录逻辑');
-                        // 立即处理回调，不等待页面加载
-                        Future.delayed(const Duration(milliseconds: 100), () {
+                        // 直接处理（不再延迟，避免组件销毁后触发）
+                        if (!_completed) {
                           _handleCallback(url.toString());
-                        });
+                        }
                         return NavigationResponseAction.ALLOW;
                       }
 
@@ -174,6 +181,13 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   }
 
   void _handleCallback(String url) async {
+    // 防止重复调用
+    if (_completed) {
+      print('⚠️ 回调已处理，跳过重复调用');
+      return;
+    }
+    _completed = true;
+
     try {
       print('🔍 处理回调URL: $url');
       final uri = Uri.parse(url);
