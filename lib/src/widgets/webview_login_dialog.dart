@@ -114,36 +114,46 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
 
                       // 检查是否是完整的回调URL（必须以回调URL开头）
                       final callbackUrl = _getCallbackUrl();
+                      print('🔍 期望的回调URL: $callbackUrl');
+                      print('🔍 当前URL: ${url.toString()}');
+                      print(
+                        '🔍 URL匹配检查: ${url.toString().startsWith(callbackUrl)}',
+                      );
+
                       if (url != null &&
                           url.toString().startsWith(callbackUrl)) {
                         print('✅ 检测到完整回调URL，直接处理登录逻辑');
                         // 直接处理回调，不需要等待页面加载完成
                         _handleCallback(url.toString());
+                      } else {
+                        print('❌ URL不匹配，跳过处理');
                       }
                     },
-                    onNavigationResponse:
-                        (controller, navigationResponse) async {
-                          final url = navigationResponse.response?.url;
-                          print('🔍 导航响应: $url');
+                    onNavigationResponse: (controller, navigationResponse) async {
+                      final url = navigationResponse.response?.url;
+                      print('🔍 导航响应: $url');
 
-                          // 检查是否是完整的回调URL（必须以回调URL开头）
-                          final callbackUrl = _getCallbackUrl();
-                          if (url != null &&
-                              url.toString().startsWith(callbackUrl)) {
-                            print('✅ 检测到完整回调URL，立即处理登录逻辑');
-                            // 立即处理回调，不等待页面加载
-                            Future.delayed(
-                              const Duration(milliseconds: 100),
-                              () {
-                                _handleCallback(url.toString());
-                              },
-                            );
-                            return NavigationResponseAction.ALLOW;
-                          }
+                      // 检查是否是完整的回调URL（必须以回调URL开头）
+                      final callbackUrl = _getCallbackUrl();
+                      print('🔍 [导航响应] 期望的回调URL: $callbackUrl');
+                      print('🔍 [导航响应] 当前URL: ${url.toString()}');
+                      print(
+                        '🔍 [导航响应] URL匹配检查: ${url.toString().startsWith(callbackUrl)}',
+                      );
 
-                          // 允许所有其他导航
-                          return NavigationResponseAction.ALLOW;
-                        },
+                      if (url != null &&
+                          url.toString().startsWith(callbackUrl)) {
+                        print('✅ [导航响应] 检测到完整回调URL，立即处理登录逻辑');
+                        // 立即处理回调，不等待页面加载
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          _handleCallback(url.toString());
+                        });
+                        return NavigationResponseAction.ALLOW;
+                      }
+
+                      // 允许所有其他导航
+                      return NavigationResponseAction.ALLOW;
+                    },
                     onReceivedError: (controller, request, error) {
                       print('❌ WebView错误: ${error.description}');
                       setState(() {
@@ -172,6 +182,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       final error = uri.queryParameters['error'];
 
       print('🔍 URL参数 - code: $code, state: $state, error: $error');
+      print('🔍 所有查询参数: ${uri.queryParameters}');
 
       // 检查是否有错误
       if (error != null) {
