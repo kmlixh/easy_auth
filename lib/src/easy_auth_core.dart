@@ -247,10 +247,7 @@ class EasyAuth {
     return googleService.getCurrentPlatform();
   }
 
-  /// 检测是否为Web平台
-  bool _isWebPlatform() {
-    return kIsWeb;
-  }
+  // 移除未使用的 _isWebPlatform
 
   // 已移除对外的统一 login() 方法，改为全屏 LoginPage
 
@@ -519,23 +516,31 @@ class EasyAuth {
 
   /// 执行Apple登录（统一内部方法）
   Future<LoginResult> _performAppleLogin([BuildContext? context]) async {
-    // 规则：
-    // 1) Web 平台 => WebView 登录
-    // 2) 非 Web 平台但未设置原生回调 => WebView 登录
-    // 3) 仅当设置了原生回调才走原生登录
-    final shouldUseWeb = _isWebPlatform() || _appleLoginCallback == null;
+    // 平台规则：
+    // - iOS / macOS => 原生登录（要求设置过 _appleLoginCallback）
+    // - 其他平台（含 Web、Android、Windows、Linux）=> WebView 登录
+    final useNative = _shouldUseAppleNative();
 
-    if (shouldUseWeb) {
-      if (context == null) {
-        throw auth_exception.PlatformException(
-          'WebView login requires BuildContext',
-          platform: 'web',
-        );
-      }
-      return await _loginWithAppleWeb(context);
+    if (useNative) {
+      return await _loginWithAppleNative();
     }
 
-    return await _loginWithAppleNative();
+    if (context == null) {
+      throw auth_exception.PlatformException(
+        'WebView login requires BuildContext',
+        platform: 'web',
+      );
+    }
+    return await _loginWithAppleWeb(context);
+  }
+
+  /// 是否应使用 Apple 原生登录（仅 iOS / macOS 且回调已设置）
+  bool _shouldUseAppleNative() {
+    if (kIsWeb) return false;
+    final platform = defaultTargetPlatform;
+    final isApplePlatform =
+        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+    return isApplePlatform && _appleLoginCallback != null;
   }
 
   /// Apple原生登录（私有方法）
