@@ -128,7 +128,7 @@ class ThirdPartyLoginButtons extends StatelessWidget {
 
   /// 执行Apple登录（自动选择登录方式）
   Future<LoginResult> _performAppleLogin(BuildContext context) async {
-    // EasyAuth 自动检测平台并选择登录方式
+    // 调用 EasyAuth 内部Apple登录，避免在登录页面里再次打开登录页面
     return await EasyAuth().loginWithApple(context);
   }
 

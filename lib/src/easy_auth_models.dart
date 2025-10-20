@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// 配置类
 class EasyAuthConfig {
   final String baseUrl;
@@ -5,6 +7,9 @@ class EasyAuthConfig {
   final String sceneId;
   final bool enableAutoRefresh;
   final Duration? autoRefreshInterval;
+  final Color? primaryColor;
+  final Color? backgroundColor;
+  final Color? surfaceColor;
 
   const EasyAuthConfig({
     required this.baseUrl,
@@ -12,6 +17,9 @@ class EasyAuthConfig {
     required this.sceneId,
     this.enableAutoRefresh = true,
     this.autoRefreshInterval,
+    this.primaryColor,
+    this.backgroundColor,
+    this.surfaceColor,
   });
 }
 
@@ -70,6 +78,25 @@ class LoginResult {
   bool get isSuccess => status == LoginStatus.success;
 
   LoginResult({required this.status, this.token, this.userInfo, this.message});
+
+  /// 创建失败结果
+  factory LoginResult.failure(String message) {
+    return LoginResult(status: LoginStatus.failed, message: message);
+  }
+
+  /// 创建成功结果
+  factory LoginResult.success({
+    required String token,
+    UserInfo? userInfo,
+    String? message,
+  }) {
+    return LoginResult(
+      status: LoginStatus.success,
+      token: token,
+      userInfo: userInfo,
+      message: message,
+    );
+  }
 
   factory LoginResult.fromJson(Map<String, dynamic> json) {
     final statusStr = json['status'] as String?;

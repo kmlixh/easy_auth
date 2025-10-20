@@ -8,6 +8,7 @@ import 'easy_auth_api_client.dart';
 import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
+import 'widgets/easy_auth_login_page.dart';
 
 /// EasyAuth核心类 - 纯Flutter包
 /// 提供统一的登录、登出、Token管理功能
@@ -16,6 +17,7 @@ class EasyAuth {
   EasyAuthApiClient? _apiClient;
   UserInfo? _currentUser;
   String? _currentToken;
+  TenantConfig? _tenantConfig; // 缓存租户配置（含可用登录方式）
 
   // 第三方登录回调（由宿主应用设置）
   Future<Map<String, dynamic>?> Function()? _appleLoginCallback;
@@ -43,12 +45,25 @@ class EasyAuth {
   /// 加载租户配置
   Future<void> _loadTenantConfig() async {
     try {
-      await apiClient.getTenantConfig();
+      final config = await apiClient.getTenantConfig();
+      _tenantConfig = config; // 缓存一次，供UI直接读取
       // Google登录现在使用Web方式，不需要设置配置
     } catch (e) {
       print('⚠️ 加载租户配置失败: $e');
     }
   }
+
+  /// 已加载的租户配置（包含 supportedChannels）。需先 init()。
+  TenantConfig? get tenantConfig => _tenantConfig;
+
+  /// 当前主题色
+  Color get primaryColor => _config?.primaryColor ?? Colors.pink[300]!;
+
+  /// 当前背景色
+  Color get backgroundColor => _config?.backgroundColor ?? Colors.white;
+
+  /// 当前表面色
+  Color get surfaceColor => _config?.surfaceColor ?? Colors.grey[50]!;
 
   /// 当前配置
   EasyAuthConfig get config {
@@ -237,41 +252,31 @@ class EasyAuth {
     return kIsWeb;
   }
 
-  /// 统一登录方法（自动选择平台和登录方式）
-  Future<void> login({
-    required Function(LoginResult) onSuccess,
-    required Function(String) onError,
-    BuildContext? context,
-  }) async {
-    try {
-      print('🔐 启动登录...');
+  // 已移除对外的统一 login() 方法，改为全屏 LoginPage
 
-      // 检测平台，自动选择登录方式
-      if (_isWebPlatform()) {
-        if (context == null) {
-          onError('Web platform requires context for login');
-          return;
-        }
-        // Web平台使用WebView登录
-        final result = await _loginWithAppleWeb(context);
-        if (result.isSuccess) {
-          onSuccess(result);
-        } else {
-          onError(result.message ?? 'Login failed');
-        }
-      } else {
-        // 原生平台使用原生登录
-        final result = await _loginWithAppleNative();
-        if (result.isSuccess) {
-          onSuccess(result);
-        } else {
-          onError(result.message ?? 'Login failed');
-        }
-      }
+  /// Apple登录（内部API，供组件使用）
+  Future<LoginResult> loginWithApple([BuildContext? context]) async {
+    try {
+      print('🍎 启动Apple登录...');
+      return await _performAppleLogin(context);
     } catch (e, stackTrace) {
-      print('❌ 登录失败: $e');
-      onError(e.toString());
+      throw auth_exception.AuthenticationException(
+        'Apple login failed: $e',
+        originalError: e,
+        stackTrace: stackTrace,
+      );
     }
+  }
+
+  /// 跳转到登录页面（对外暴露的统一入口）
+  Future<LoginResult> showLoginPage(BuildContext context) async {
+    return await Navigator.of(context).push<LoginResult>(
+          MaterialPageRoute(
+            builder: (context) => const EasyAuthLoginPage(),
+            fullscreenDialog: true,
+          ),
+        ) ??
+        LoginResult.failure('用户取消登录');
   }
 
   /// 智能处理登录状态（已登录显示用户信息，未登录显示登录页面）
@@ -288,20 +293,43 @@ class EasyAuth {
     } else {
       // 未登录：显示登录页面
       print('🔐 用户未登录，启动登录');
-      await login(
-        context: context,
-        onSuccess: (result) {
+      try {
+        final result = await showLoginPage(context);
+        if (result.isSuccess) {
           if (onLoginSuccess != null) {
             onLoginSuccess(result);
           }
-        },
-        onError: (error) {
+        } else {
           if (onLoginError != null) {
-            onLoginError(error);
+            onLoginError(result.message ?? '登录失败');
           }
-        },
-      );
+        }
+      } catch (e) {
+        if (onLoginError != null) {
+          onLoginError(e.toString());
+        }
+      }
     }
+  }
+
+  /// 显示用户信息编辑页面
+  void showEditUserInfo(BuildContext context) {
+    if (!isLoggedIn) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请先登录')));
+      return;
+    }
+
+    final user = currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('用户信息获取失败')));
+      return;
+    }
+
+    _showEditUserInfoDialog(context, user);
   }
 
   /// 显示用户信息对话框
@@ -337,10 +365,8 @@ class EasyAuth {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              // 可以在这里添加编辑用户信息的逻辑
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('编辑功能开发中')));
+              // 显示编辑用户信息页面
+              _showEditUserInfoDialog(context, user);
             },
             child: const Text('编辑'),
           ),
@@ -372,7 +398,147 @@ class EasyAuth {
     }
   }
 
-  /// Apple原生登录
+  /// 显示编辑用户信息对话框
+  void _showEditUserInfoDialog(BuildContext context, UserInfo user) {
+    final nicknameController = TextEditingController(text: user.nickname ?? '');
+    final avatarController = TextEditingController(text: user.avatar ?? '');
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('编辑用户信息'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 昵称输入框
+                TextField(
+                  controller: nicknameController,
+                  decoration: const InputDecoration(
+                    labelText: '昵称',
+                    hintText: '请输入昵称',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 头像URL输入框
+                TextField(
+                  controller: avatarController,
+                  decoration: const InputDecoration(
+                    labelText: '头像URL',
+                    hintText: '请输入头像链接',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 当前头像预览
+                if (user.avatar != null && user.avatar!.isNotEmpty)
+                  Column(
+                    children: [
+                      const Text(
+                        '当前头像:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      CircleAvatar(
+                        radius: 40,
+                        backgroundImage: NetworkImage(user.avatar!),
+                        onBackgroundImageError: (exception, stackTrace) {
+                          // 头像加载失败时显示默认图标
+                        },
+                        child: user.avatar == null || user.avatar!.isEmpty
+                            ? const Icon(Icons.person, size: 40)
+                            : null,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setState(() {
+                        isLoading = true;
+                      });
+
+                      try {
+                        // 调用更新用户信息API
+                        await updateUserInfo(
+                          nickname: nicknameController.text.trim().isEmpty
+                              ? null
+                              : nicknameController.text.trim(),
+                          avatar: avatarController.text.trim().isEmpty
+                              ? null
+                              : avatarController.text.trim(),
+                        );
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('用户信息更新成功')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('更新失败: $e')));
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setState(() {
+                            isLoading = false;
+                          });
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('保存'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 执行Apple登录（统一内部方法）
+  Future<LoginResult> _performAppleLogin([BuildContext? context]) async {
+    // 规则：
+    // 1) Web 平台 => WebView 登录
+    // 2) 非 Web 平台但未设置原生回调 => WebView 登录
+    // 3) 仅当设置了原生回调才走原生登录
+    final shouldUseWeb = _isWebPlatform() || _appleLoginCallback == null;
+
+    if (shouldUseWeb) {
+      if (context == null) {
+        throw auth_exception.PlatformException(
+          'WebView login requires BuildContext',
+          platform: 'web',
+        );
+      }
+      return await _loginWithAppleWeb(context);
+    }
+
+    return await _loginWithAppleNative();
+  }
+
+  /// Apple原生登录（私有方法）
   Future<LoginResult> _loginWithAppleNative() async {
     if (_appleLoginCallback == null) {
       throw auth_exception.PlatformException(
@@ -401,7 +567,7 @@ class EasyAuth {
     return loginResult;
   }
 
-  /// Apple Web登录
+  /// Apple Web登录（私有方法）
   Future<LoginResult> _loginWithAppleWeb(BuildContext context) async {
     final webAppleService = WebAppleLoginService();
     final result = await webAppleService.signIn(context);

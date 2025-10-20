@@ -11,6 +11,12 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
   /// 登录失败回调
   final Function(dynamic error)? onLoginFailed;
 
+  /// 登录开始回调（用于显示加载遮罩）
+  final VoidCallback? onLoginStart;
+
+  /// 是否抑制内部反馈（不弹SnackBar，由外部处理提示）
+  final bool suppressFeedback;
+
   /// 显示微信登录按钮
   final bool showWechat;
 
@@ -25,27 +31,34 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
   final ButtonStyle? appleButtonStyle;
   final ButtonStyle? googleButtonStyle;
 
+  /// 主题色
+  final Color? primaryColor;
+
   const EnhancedThirdPartyLoginButtons({
     super.key,
     this.onLoginSuccess,
     this.onLoginFailed,
+    this.onLoginStart,
+    this.suppressFeedback = false,
     this.showWechat = true,
     this.showApple = true,
     this.showGoogle = true,
     this.wechatButtonStyle,
     this.appleButtonStyle,
     this.googleButtonStyle,
+    this.primaryColor,
   });
 
   /// 微信登录
   Future<void> _loginWithWechat(BuildContext context) async {
     try {
+      onLoginStart?.call();
       print('📱 开始微信登录...');
       final result = await EasyAuth().loginWithWechat();
 
       if (result.isSuccess) {
         print('✅ 微信登录成功');
-        if (context.mounted) {
+        if (!suppressFeedback && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('微信登录成功'),
@@ -57,7 +70,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       }
     } on auth_exception.PlatformException catch (e) {
       print('❌ 微信登录失败: ${e.message}');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         String message = '微信登录失败';
         if (e.message.contains('APP_NOT_INSTALLED')) {
           message = '未安装微信';
@@ -72,7 +85,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       onLoginFailed?.call(e);
     } catch (e) {
       print('❌ 微信登录异常: $e');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('微信登录失败: $e'), backgroundColor: Colors.red),
         );
@@ -84,13 +97,14 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
   /// Apple登录
   Future<void> _loginWithApple(BuildContext context) async {
     try {
+      onLoginStart?.call();
       print('🍎 开始Apple登录...');
       // 检测平台，决定使用原生登录还是Web登录
       final result = await _performAppleLogin(context);
 
       if (result.isSuccess) {
         print('✅ Apple登录成功');
-        if (context.mounted) {
+        if (!suppressFeedback && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Apple登录成功'),
@@ -102,7 +116,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       }
     } on auth_exception.PlatformException catch (e) {
       print('❌ Apple登录失败: ${e.message}');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         String message = 'Apple登录失败';
         if (e.message.contains('UNAVAILABLE')) {
           message = '需要iOS 13.0+';
@@ -117,7 +131,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       onLoginFailed?.call(e);
     } catch (e) {
       print('❌ Apple登录异常: $e');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Apple登录失败: $e'), backgroundColor: Colors.red),
         );
@@ -128,13 +142,14 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
 
   /// 执行Apple登录（自动选择登录方式）
   Future<LoginResult> _performAppleLogin(BuildContext context) async {
-    // EasyAuth 自动检测平台并选择登录方式
+    // 调用 EasyAuth 内部Apple登录，避免在登录页面里再次打开登录页面
     return await EasyAuth().loginWithApple(context);
   }
 
   /// Google登录
   Future<void> _loginWithGoogle(BuildContext context) async {
     try {
+      onLoginStart?.call();
       print('🔍 开始Google登录...');
 
       // 调用 EasyAuth 的 Google 登录方法
@@ -143,7 +158,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
 
       if (result.isSuccess) {
         print('✅ Google登录成功');
-        if (context.mounted) {
+        if (!suppressFeedback && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Google登录成功'),
@@ -155,7 +170,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       }
     } on auth_exception.PlatformException catch (e) {
       print('❌ Google登录失败: ${e.message}');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         String message = 'Google登录失败';
         if (e.message.contains('UNAVAILABLE')) {
           message = 'Google服务不可用';
@@ -172,7 +187,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
       onLoginFailed?.call(e);
     } catch (e) {
       print('❌ Google登录异常: $e');
-      if (context.mounted) {
+      if (!suppressFeedback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Google登录失败: $e'),
@@ -186,6 +201,7 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final buttons = <Widget>[];
 
     // 微信登录按钮
@@ -201,6 +217,9 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
                 OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF07C160),
                   side: const BorderSide(color: Color(0xFF07C160)),
+                  backgroundColor: isDarkMode
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
                 ),
             icon: const Icon(Icons.wechat, size: 24),
             label: const Text('微信登录'),
@@ -225,6 +244,9 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
                 OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF4285F4),
                   side: const BorderSide(color: Color(0xFF4285F4)),
+                  backgroundColor: isDarkMode
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
                 ),
             icon: const Icon(Icons.g_mobiledata, size: 32),
             label: const Text('Google登录'),
@@ -247,8 +269,13 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
             style:
                 appleButtonStyle ??
                 OutlinedButton.styleFrom(
-                  foregroundColor: Colors.black,
-                  side: const BorderSide(color: Colors.black),
+                  foregroundColor: isDarkMode ? Colors.white : Colors.black,
+                  side: BorderSide(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  backgroundColor: isDarkMode
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white,
                 ),
             icon: const Icon(Icons.apple, size: 24),
             label: const Text('Apple登录'),

@@ -4,16 +4,22 @@ import '../easy_auth_core.dart';
 import '../easy_auth_exception.dart' as auth_exception;
 import '../easy_auth_models.dart';
 
-/// 短信验证码登录表单组件
-class SMSLoginForm extends StatefulWidget {
+/// 验证码登录表单组件（支持短信和邮箱）
+class VerificationLoginForm extends StatefulWidget {
+  /// 登录类型
+  final VerificationType type;
+
   /// 登录成功回调
   final Function(LoginResult)? onLoginSuccess;
 
   /// 登录失败回调
   final Function(dynamic error)? onLoginFailed;
 
+  /// 登录开始回调（用于显示遮罩）
+  final VoidCallback? onLoginStart;
+
   /// 自定义样式
-  final InputDecoration? phoneDecoration;
+  final InputDecoration? inputDecoration;
   final InputDecoration? codeDecoration;
   final ButtonStyle? sendButtonStyle;
   final ButtonStyle? loginButtonStyle;
@@ -24,11 +30,13 @@ class SMSLoginForm extends StatefulWidget {
   /// 主题色
   final Color? primaryColor;
 
-  const SMSLoginForm({
+  const VerificationLoginForm({
     super.key,
+    required this.type,
     this.onLoginSuccess,
     this.onLoginFailed,
-    this.phoneDecoration,
+    this.onLoginStart,
+    this.inputDecoration,
     this.codeDecoration,
     this.sendButtonStyle,
     this.loginButtonStyle,
@@ -37,11 +45,16 @@ class SMSLoginForm extends StatefulWidget {
   });
 
   @override
-  State<SMSLoginForm> createState() => _SMSLoginFormState();
+  State<VerificationLoginForm> createState() => _VerificationLoginFormState();
 }
 
-class _SMSLoginFormState extends State<SMSLoginForm> {
-  final _phoneController = TextEditingController();
+enum VerificationType {
+  sms,
+  email,
+}
+
+class _VerificationLoginFormState extends State<VerificationLoginForm> {
+  final _inputController = TextEditingController();
   final _codeController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -52,7 +65,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
   @override
   void dispose() {
     _timer?.cancel();
-    _phoneController.dispose();
+    _inputController.dispose();
     _codeController.dispose();
     super.dispose();
   }
@@ -61,26 +74,44 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
   Future<void> _sendCode() async {
     if (_countdown > 0) return;
 
-    // 只验证手机号，不验证验证码（此时用户还没输入验证码）
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
+    final input = _inputController.text.trim();
+    if (input.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入手机号'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(widget.type == VerificationType.sms ? '请输入手机号' : '请输入邮箱地址'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
-    if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(phone)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入有效的手机号'), backgroundColor: Colors.red),
-      );
-      return;
+
+    // 验证格式
+    if (widget.type == VerificationType.sms) {
+      if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(input)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的手机号'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    } else {
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(input)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入有效的邮箱地址'), backgroundColor: Colors.red),
+        );
+        return;
+      }
     }
 
     setState(() => _loading = true);
 
     try {
-      print('📱 发送短信验证码: $phone');
-      await EasyAuth().sendSMSCode(phone);
+      if (widget.type == VerificationType.sms) {
+        print('📱 发送短信验证码: $input');
+        await EasyAuth().sendSMSCode(input);
+      } else {
+        print('📧 发送邮箱验证码: $input');
+        await EasyAuth().sendEmailCode(input);
+      }
 
       // 开始倒计时
       setState(() => _countdown = widget.countdownSeconds);
@@ -96,9 +127,9 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('验证码已发送'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(widget.type == VerificationType.sms ? '验证码已发送' : '验证码已发送到邮箱'),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
@@ -128,47 +159,27 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _loading = true);
+    widget.onLoginStart?.call(); // 通知外部显示遮罩
 
     try {
-      final result = await EasyAuth().loginWithSms(
-        phoneNumber: _phoneController.text,
-        verificationCode: _codeController.text,
-      );
+      final result = widget.type == VerificationType.sms
+          ? await EasyAuth().loginWithSms(
+              phoneNumber: _inputController.text,
+              verificationCode: _codeController.text,
+            )
+          : await EasyAuth().loginWithEmail(
+              email: _inputController.text,
+              verificationCode: _codeController.text,
+            );
 
       if (result.isSuccess) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('登录成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
         widget.onLoginSuccess?.call(result);
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(result.message ?? '登录失败'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
         widget.onLoginFailed?.call(result.message);
       }
     } on auth_exception.VerificationCodeException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-        );
-      }
       widget.onLoginFailed?.call(e);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('登录失败: $e'), backgroundColor: Colors.red),
-        );
-      }
       widget.onLoginFailed?.call(e);
     } finally {
       if (mounted) {
@@ -181,21 +192,24 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = widget.primaryColor ?? theme.primaryColor;
+    final isSms = widget.type == VerificationType.sms;
 
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 手机号输入
+          // 输入框（手机号或邮箱）
           TextFormField(
-            controller: _phoneController,
-            decoration:
-                widget.phoneDecoration ??
+            controller: _inputController,
+            decoration: widget.inputDecoration ??
                 InputDecoration(
-                  labelText: '手机号',
-                  hintText: '请输入手机号',
-                  prefixIcon: Icon(Icons.phone, color: primaryColor),
+                  labelText: isSms ? '手机号' : '邮箱',
+                  hintText: isSms ? '请输入手机号' : '请输入邮箱地址',
+                  prefixIcon: Icon(
+                    isSms ? Icons.phone : Icons.email_outlined,
+                    color: primaryColor,
+                  ),
                   filled: true,
                   fillColor: theme.brightness == Brightness.dark
                       ? Colors.grey[850]
@@ -218,22 +232,28 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 16,
+                    vertical: 12,
                   ),
                 ),
-            keyboardType: TextInputType.phone,
+            keyboardType: isSms ? TextInputType.phone : TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return '请输入手机号';
+                return isSms ? '请输入手机号' : '请输入邮箱地址';
               }
-              if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
-                return '请输入有效的手机号';
+              if (isSms) {
+                if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
+                  return '请输入有效的手机号';
+                }
+              } else {
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                  return '请输入有效的邮箱地址';
+                }
               }
               return null;
             },
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // 验证码输入
           Row(
@@ -242,8 +262,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
               Expanded(
                 child: TextFormField(
                   controller: _codeController,
-                  decoration:
-                      widget.codeDecoration ??
+                  decoration: widget.codeDecoration ??
                       InputDecoration(
                         labelText: '验证码',
                         hintText: '请输入验证码',
@@ -276,7 +295,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 16,
+                          vertical: 12,
                         ),
                         counterText: '',
                       ),
@@ -299,10 +318,9 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                 height: 56,
                 child: ElevatedButton(
                   onPressed: _countdown > 0 || _loading ? null : _sendCode,
-                  style:
-                      widget.sendButtonStyle ??
+                  style: widget.sendButtonStyle ??
                       ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor.withOpacity(0.1),
+                        backgroundColor: primaryColor.withValues(alpha: 0.1),
                         foregroundColor: primaryColor,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -321,15 +339,14 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
             ],
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
 
           // 登录按钮
           SizedBox(
             height: 52,
             child: ElevatedButton(
               onPressed: _loading ? null : _login,
-              style:
-                  widget.loginButtonStyle ??
+              style: widget.loginButtonStyle ??
                   ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
@@ -337,7 +354,7 @@ class _SMSLoginFormState extends State<SMSLoginForm> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(26),
                     ),
-                    shadowColor: primaryColor.withOpacity(0.3),
+                    shadowColor: primaryColor.withValues(alpha: 0.3),
                   ),
               child: _loading
                   ? const SizedBox(
