@@ -24,6 +24,7 @@ class EasyAuthLoginPage extends StatefulWidget {
 class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   bool _submitting = false; // 登录中的遮罩
   Timer? _configCheckTimer;
+  bool _completedPop = false; // 防止重复关闭导致返回值异常
 
   @override
   void initState() {
@@ -50,10 +51,12 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   /// 处理登录成功
   void _handleLoginSuccess(LoginResult result) {
     if (!mounted) return;
+    if (_completedPop) return;
+    _completedPop = true;
     setState(() => _submitting = false);
-    if (widget.onLoginSuccess != null) {
-      widget.onLoginSuccess!(result);
-    }
+    try {
+      widget.onLoginSuccess?.call(result);
+    } catch (_) {}
     // 默认：关闭页面并返回结果
     Navigator.of(context).pop<LoginResult>(result);
   }
@@ -61,10 +64,12 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   /// 处理登录失败
   void _handleLoginFailed(dynamic error) {
     if (!mounted) return;
+    if (_completedPop) return;
+    _completedPop = true;
     setState(() => _submitting = false);
-    if (widget.onLoginFailed != null) {
-      widget.onLoginFailed!(error);
-    }
+    try {
+      widget.onLoginFailed?.call(error);
+    } catch (_) {}
     // 失败也立即关闭页面并把失败结果抛给外部
     Navigator.of(
       context,
