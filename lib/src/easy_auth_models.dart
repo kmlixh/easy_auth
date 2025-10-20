@@ -266,3 +266,6 @@ class TenantConfig {
     };
   }
 }
+
+/// 用户信息页面内的动作
+enum UserInfoAction { none, edited, loggedOut }

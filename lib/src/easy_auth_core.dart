@@ -322,11 +322,12 @@ class EasyAuth {
     Function(LoginResult)? onLoginSuccess,
     Function(String)? onLoginError,
     Function(UserInfo)? onUserInfoShown,
+    Function(UserInfoAction action)? onUserInfoAction,
   }) async {
     if (isLoggedIn) {
       // 已登录：显示用户信息
       print('🔐 用户已登录，显示用户信息');
-      _showUserInfoDialog(context, onUserInfoShown);
+      _showUserInfoDialog(context, onUserInfoShown, onUserInfoAction);
     } else {
       // 未登录：显示登录页面
       print('🔐 用户未登录，启动登录');
@@ -366,16 +367,19 @@ class EasyAuth {
       return;
     }
 
-    _showEditUserInfoDialog(context, user);
+    _showEditUserInfoDialog(context, user, null);
   }
 
   /// 显示用户信息对话框
   void _showUserInfoDialog(
     BuildContext context,
     Function(UserInfo)? onUserInfoShown,
+    Function(UserInfoAction action)? onUserInfoAction,
   ) {
     final user = currentUser;
     if (user == null) return;
+    // 捕获外层上下文用于关闭对话框后安全地显示提示
+    final outerContext = context;
 
     showDialog(
       context: context,
@@ -403,7 +407,7 @@ class EasyAuth {
             onPressed: () {
               Navigator.pop(context);
               // 显示编辑用户信息页面
-              _showEditUserInfoDialog(context, user);
+              _showEditUserInfoDialog(context, user, onUserInfoAction);
             },
             child: const Text('编辑'),
           ),
@@ -413,14 +417,25 @@ class EasyAuth {
               // 退出登录
               logout()
                   .then((_) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('已退出登录')));
+                    try {
+                      if (outerContext.mounted) {
+                        ScaffoldMessenger.of(
+                          outerContext,
+                        ).showSnackBar(const SnackBar(content: Text('已退出登录')));
+                      }
+                    } catch (_) {}
+                    if (onUserInfoAction != null) {
+                      onUserInfoAction(UserInfoAction.loggedOut);
+                    }
                   })
                   .catchError((error) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('退出登录失败: $error')));
+                    try {
+                      if (outerContext.mounted) {
+                        ScaffoldMessenger.of(outerContext).showSnackBar(
+                          SnackBar(content: Text('退出登录失败: $error')),
+                        );
+                      }
+                    } catch (_) {}
                   });
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -436,7 +451,11 @@ class EasyAuth {
   }
 
   /// 显示编辑用户信息对话框
-  void _showEditUserInfoDialog(BuildContext context, UserInfo user) {
+  void _showEditUserInfoDialog(
+    BuildContext context,
+    UserInfo user,
+    Function(UserInfoAction action)? onUserInfoAction,
+  ) {
     final nicknameController = TextEditingController(text: user.nickname ?? '');
     final avatarController = TextEditingController(text: user.avatar ?? '');
     bool isLoading = false;
@@ -525,6 +544,9 @@ class EasyAuth {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('用户信息更新成功')),
                           );
+                        }
+                        if (onUserInfoAction != null) {
+                          onUserInfoAction(UserInfoAction.edited);
                         }
                       } catch (e) {
                         if (context.mounted) {

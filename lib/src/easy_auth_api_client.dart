@@ -366,7 +366,10 @@ class EasyAuthApiClient {
       headers: {'Content-Type': 'application/json'},
     );
 
-    _handleResponse(response);
+    // 有些后端可能返回纯文本，如 "ok"，容错处理
+    if (response.statusCode != 200) {
+      _handleResponse(response);
+    }
   }
 
   /// 获取租户配置（可用的登录渠道）
