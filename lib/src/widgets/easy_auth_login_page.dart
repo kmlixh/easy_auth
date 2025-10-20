@@ -49,6 +49,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
 
   /// 处理登录成功
   void _handleLoginSuccess(LoginResult result) {
+    if (!mounted) return;
     setState(() => _submitting = false);
     if (widget.onLoginSuccess != null) {
       widget.onLoginSuccess!(result);
@@ -59,6 +60,7 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
 
   /// 处理登录失败
   void _handleLoginFailed(dynamic error) {
+    if (!mounted) return;
     setState(() => _submitting = false);
     if (widget.onLoginFailed != null) {
       widget.onLoginFailed!(error);

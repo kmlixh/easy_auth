@@ -8,6 +8,8 @@ import 'easy_auth_api_client.dart';
 import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
+import 'services/native_apple_login_service.dart';
+import 'package:flutter/services.dart' as services;
 import 'widgets/easy_auth_login_page.dart';
 
 /// EasyAuth核心类 - 纯Flutter包
@@ -19,8 +21,7 @@ class EasyAuth {
   String? _currentToken;
   TenantConfig? _tenantConfig; // 缓存租户配置（含可用登录方式）
 
-  // 第三方登录回调（由宿主应用设置）
-  Future<Map<String, dynamic>?> Function()? _appleLoginCallback;
+  // 第三方登录回调（仅用于微信，Apple 走内置原生服务）
   Future<Map<String, dynamic>?> Function()? _wechatLoginCallback;
 
   static final EasyAuth _instance = EasyAuth._internal();
@@ -36,10 +37,14 @@ class EasyAuth {
       sceneId: config.sceneId,
     );
 
-    // 获取租户配置并设置Google配置
-    await _loadTenantConfig();
-
+    // 先快速恢复本地会话，避免首屏白屏
     await _restoreSession();
+
+    // 优先从缓存加载租户配置（快速可用），随后后台刷新网络配置
+    await _loadTenantConfigFromCache();
+    // 后台刷新，不阻塞初始化
+    // ignore: discarded_futures
+    _refreshTenantConfigInBackground();
   }
 
   /// 加载租户配置
@@ -48,8 +53,43 @@ class EasyAuth {
       final config = await apiClient.getTenantConfig();
       _tenantConfig = config; // 缓存一次，供UI直接读取
       // Google登录现在使用Web方式，不需要设置配置
+      await _saveTenantConfigToCache(config);
     } catch (e) {
       print('⚠️ 加载租户配置失败: $e');
+    }
+  }
+
+  /// 从缓存加载租户配置，提升启动速度
+  Future<void> _loadTenantConfigFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('easy_auth_tenant_config');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+        _tenantConfig = TenantConfig.fromJson(json);
+      }
+    } catch (e) {
+      print('⚠️ 读取租户配置缓存失败: $e');
+    }
+  }
+
+  /// 保存租户配置到缓存
+  Future<void> _saveTenantConfigToCache(TenantConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = jsonEncode(config.toJson());
+      await prefs.setString('easy_auth_tenant_config', jsonStr);
+    } catch (e) {
+      print('⚠️ 写入租户配置缓存失败: $e');
+    }
+  }
+
+  /// 在后台刷新租户配置
+  Future<void> _refreshTenantConfigInBackground() async {
+    try {
+      await _loadTenantConfig();
+    } catch (_) {
+      // 已在 _loadTenantConfig 内部处理
     }
   }
 
@@ -517,12 +557,27 @@ class EasyAuth {
   /// 执行Apple登录（统一内部方法）
   Future<LoginResult> _performAppleLogin([BuildContext? context]) async {
     // 平台规则：
-    // - iOS / macOS => 原生登录（要求设置过 _appleLoginCallback）
+    // - iOS / macOS => 原生登录（内置原生服务）
     // - 其他平台（含 Web、Android、Windows、Linux）=> WebView 登录
     final useNative = _shouldUseAppleNative();
 
     if (useNative) {
-      return await _loginWithAppleNative();
+      try {
+        return await _loginWithAppleNative();
+      } on services.MissingPluginException catch (_) {
+        // 原生未实现：自动回退到 Web（需有 context）
+        if (context != null) {
+          return await _loginWithAppleWeb(context);
+        }
+        rethrow;
+      } catch (e) {
+        print('🍎 Apple原生登录失败: $e');
+        // 其他原生错误同样尝试回退到 Web
+        if (context != null) {
+          return await _loginWithAppleWeb(context);
+        }
+        rethrow;
+      }
     }
 
     if (context == null) {
@@ -534,25 +589,19 @@ class EasyAuth {
     return await _loginWithAppleWeb(context);
   }
 
-  /// 是否应使用 Apple 原生登录（仅 iOS / macOS 且回调已设置）
+  /// 是否应使用 Apple 原生登录（iOS / macOS 一律原生）
   bool _shouldUseAppleNative() {
-    if (kIsWeb) return false;
     final platform = defaultTargetPlatform;
     final isApplePlatform =
         platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-    return isApplePlatform && _appleLoginCallback != null;
+    return isApplePlatform;
   }
 
   /// Apple原生登录（私有方法）
   Future<LoginResult> _loginWithAppleNative() async {
-    if (_appleLoginCallback == null) {
-      throw auth_exception.PlatformException(
-        'Apple login callback not set',
-        platform: 'apple',
-      );
-    }
+    // 使用内置原生服务
+    final result = await NativeAppleLoginService().signIn();
 
-    final result = await _appleLoginCallback!();
     if (result == null) {
       throw auth_exception.PlatformException(
         'User cancelled',
@@ -561,8 +610,8 @@ class EasyAuth {
     }
 
     final loginResult = await apiClient.loginWithApple(
-      authCode: result['authCode'] ?? '',
       idToken: result['idToken'],
+      authCode: result['authCode'],
     );
 
     if (loginResult.isSuccess && loginResult.token != null) {
@@ -653,12 +702,6 @@ class EasyAuth {
   // ========================================
   // 回调设置
   // ========================================
-
-  void setAppleLoginCallback(
-    Future<Map<String, dynamic>?> Function() callback,
-  ) {
-    _appleLoginCallback = callback;
-  }
 
   void setWechatLoginCallback(
     Future<Map<String, dynamic>?> Function() callback,

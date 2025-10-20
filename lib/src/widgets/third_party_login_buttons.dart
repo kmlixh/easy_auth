@@ -87,8 +87,12 @@ class ThirdPartyLoginButtons extends StatelessWidget {
 
   /// Apple登录
   Future<void> _loginWithApple(BuildContext context) async {
+    // 防连点：全局节流
+    // 使用库级别的静态标志（简易防抖）
+    if (_AppleLoginGuard.inProgress) return;
+    _AppleLoginGuard.inProgress = true;
     try {
-      // 检测平台，决定使用原生登录还是Web登录
+      // 平台选择与回退由 EasyAuth 内部统一处理
       final result = await _performAppleLogin(context);
 
       if (result.isSuccess) {
@@ -123,6 +127,8 @@ class ThirdPartyLoginButtons extends StatelessWidget {
         );
       }
       onLoginFailed?.call(e);
+    } finally {
+      _AppleLoginGuard.inProgress = false;
     }
   }
 
@@ -292,4 +298,9 @@ class ThirdPartyLoginButtons extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Apple 登录节流保护（避免多次点击同时触发）
+class _AppleLoginGuard {
+  static bool inProgress = false;
 }

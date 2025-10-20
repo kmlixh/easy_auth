@@ -169,13 +169,19 @@ class EasyAuthApiClient {
     );
   }
 
-  /// Apple ID登录（一次性完成）
-  /// 需要先通过原生SDK获取authCode和idToken
+  /// Apple 登录（一次性完成）
+  /// 原生：仅需要 idToken；部分平台可能同时提供 authCode
+  /// 注意：后端原生路径只要求 id_token，web 路径通过 loginWithAppleWeb()
   Future<LoginResult> loginWithApple({
-    required String authCode,
+    String? authCode,
     String? idToken,
   }) async {
     print('📤 [loginWithApple] 一次性登录');
+
+    // 构建 channel_data：原生仅需 id_token；如有 code 一并传递（后端原生路径忽略 code）
+    final Map<String, dynamic> channelData = {};
+    if (idToken != null) channelData['id_token'] = idToken;
+    if (authCode != null) channelData['code'] = authCode;
 
     final response = await _client.post(
       Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
@@ -184,10 +190,7 @@ class EasyAuthApiClient {
         'tenant_id': tenantId,
         'scene_id': sceneId,
         'channel_id': 'apple',
-        'channel_data': {
-          'code': authCode,
-          if (idToken != null) 'id_token': idToken,
-        },
+        'channel_data': channelData,
       }),
     );
 
