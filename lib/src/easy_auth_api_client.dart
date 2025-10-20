@@ -336,6 +336,26 @@ class EasyAuthApiClient {
     return UserInfo.fromJson(data);
   }
 
+  /// 更新用户信息
+  Future<UserInfo> updateUserInfo({
+    required String token,
+    String? nickname,
+    String? avatar,
+  }) async {
+    final body = <String, dynamic>{};
+    if (nickname != null) body['nickname'] = nickname;
+    if (avatar != null) body['avatar'] = avatar;
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.updateUserInfo}'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token, ...body}),
+    );
+
+    final data = _handleResponse(response);
+    return UserInfo.fromJson(data);
+  }
+
   /// 登出
   Future<void> logout(String token) async {
     final response = await _client.post(

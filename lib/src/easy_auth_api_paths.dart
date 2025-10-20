@@ -16,6 +16,7 @@ class EasyAuthApiPaths {
   // 用户管理接口
   static const String logout = '/user/login/logout';
   static const String getUserInfo = '/user/login/getUserInfo';
+  static const String updateUserInfo = '/user/login/updateUserInfo';
   static const String refreshToken = '/user/login/refreshToken';
 
   // 验证码相关接口

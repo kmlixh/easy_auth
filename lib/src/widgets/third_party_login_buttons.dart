@@ -126,16 +126,10 @@ class ThirdPartyLoginButtons extends StatelessWidget {
     }
   }
 
-  /// 执行Apple登录（根据平台选择登录方式）
+  /// 执行Apple登录（自动选择登录方式）
   Future<LoginResult> _performAppleLogin(BuildContext context) async {
-    // 检测平台
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      // iOS平台使用原生Apple登录
-      return await EasyAuth().loginWithApple();
-    } else {
-      // 其他平台使用Web登录
-      return await EasyAuth().loginWithAppleWeb(context);
-    }
+    // EasyAuth 自动检测平台并选择登录方式
+    return await EasyAuth().loginWithApple(context);
   }
 
   /// Google登录

@@ -232,24 +232,204 @@ class EasyAuth {
     return googleService.getCurrentPlatform();
   }
 
-  /// Apple登录
-  Future<LoginResult> loginWithApple() async {
+  /// 检测是否为Web平台
+  bool _isWebPlatform() {
+    return kIsWeb;
+  }
+
+  /// 统一登录方法（自动选择平台和登录方式）
+  Future<void> login({
+    required Function(LoginResult) onSuccess,
+    required Function(String) onError,
+    BuildContext? context,
+  }) async {
     try {
-      if (_appleLoginCallback == null) {
-        throw auth_exception.PlatformException(
-          'Apple login callback not set',
-          platform: 'apple',
-        );
+      print('🔐 启动登录...');
+
+      // 检测平台，自动选择登录方式
+      if (_isWebPlatform()) {
+        if (context == null) {
+          onError('Web platform requires context for login');
+          return;
+        }
+        // Web平台使用WebView登录
+        final result = await _loginWithAppleWeb(context);
+        if (result.isSuccess) {
+          onSuccess(result);
+        } else {
+          onError(result.message ?? 'Login failed');
+        }
+      } else {
+        // 原生平台使用原生登录
+        final result = await _loginWithAppleNative();
+        if (result.isSuccess) {
+          onSuccess(result);
+        } else {
+          onError(result.message ?? 'Login failed');
+        }
+      }
+    } catch (e, stackTrace) {
+      print('❌ 登录失败: $e');
+      onError(e.toString());
+    }
+  }
+
+  /// 智能处理登录状态（已登录显示用户信息，未登录显示登录页面）
+  Future<void> handleAuthState({
+    required BuildContext context,
+    Function(LoginResult)? onLoginSuccess,
+    Function(String)? onLoginError,
+    Function(UserInfo)? onUserInfoShown,
+  }) async {
+    if (isLoggedIn) {
+      // 已登录：显示用户信息
+      print('🔐 用户已登录，显示用户信息');
+      _showUserInfoDialog(context, onUserInfoShown);
+    } else {
+      // 未登录：显示登录页面
+      print('🔐 用户未登录，启动登录');
+      await login(
+        context: context,
+        onSuccess: (result) {
+          if (onLoginSuccess != null) {
+            onLoginSuccess(result);
+          }
+        },
+        onError: (error) {
+          if (onLoginError != null) {
+            onLoginError(error);
+          }
+        },
+      );
+    }
+  }
+
+  /// 显示用户信息对话框
+  void _showUserInfoDialog(
+    BuildContext context,
+    Function(UserInfo)? onUserInfoShown,
+  ) {
+    final user = currentUser;
+    if (user == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('用户信息'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('昵称: ${user.nickname ?? user.username ?? 'Kiku用户'}'),
+            const SizedBox(height: 8),
+            Text('邮箱: ${user.email ?? '未设置'}'),
+            const SizedBox(height: 8),
+            Text('手机: ${user.phone ?? '未设置'}'),
+            const SizedBox(height: 8),
+            Text('用户ID: ${user.userId}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // 可以在这里添加编辑用户信息的逻辑
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('编辑功能开发中')));
+            },
+            child: const Text('编辑'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // 退出登录
+              logout()
+                  .then((_) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('已退出登录')));
+                  })
+                  .catchError((error) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('退出登录失败: $error')));
+                  });
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('退出登录'),
+          ),
+        ],
+      ),
+    );
+
+    if (onUserInfoShown != null) {
+      onUserInfoShown(user);
+    }
+  }
+
+  /// Apple原生登录
+  Future<LoginResult> _loginWithAppleNative() async {
+    if (_appleLoginCallback == null) {
+      throw auth_exception.PlatformException(
+        'Apple login callback not set',
+        platform: 'apple',
+      );
+    }
+
+    final result = await _appleLoginCallback!();
+    if (result == null) {
+      throw auth_exception.PlatformException(
+        'User cancelled',
+        platform: 'apple',
+      );
+    }
+
+    final loginResult = await apiClient.loginWithApple(
+      authCode: result['authCode'] ?? '',
+      idToken: result['idToken'],
+    );
+
+    if (loginResult.isSuccess && loginResult.token != null) {
+      await _saveSession(loginResult.token!, loginResult.userInfo);
+    }
+
+    return loginResult;
+  }
+
+  /// Apple Web登录
+  Future<LoginResult> _loginWithAppleWeb(BuildContext context) async {
+    final webAppleService = WebAppleLoginService();
+    final result = await webAppleService.signIn(context);
+
+    if (result == null) {
+      throw auth_exception.PlatformException(
+        'User cancelled',
+        platform: 'apple',
+      );
+    }
+
+    // 检查是否是WebView回调结果
+    if (result.containsKey('callbackUrl')) {
+      final callbackUrl = result['callbackUrl'] as String;
+      final platform = result['platform'] as String? ?? 'web';
+
+      final loginResult = await apiClient.loginWithAppleWeb(
+        callbackUrl: callbackUrl,
+        platform: platform,
+      );
+
+      if (loginResult.isSuccess && loginResult.token != null) {
+        await _saveSession(loginResult.token!, loginResult.userInfo);
       }
 
-      final result = await _appleLoginCallback!();
-      if (result == null) {
-        throw auth_exception.PlatformException(
-          'User cancelled',
-          platform: 'apple',
-        );
-      }
-
+      return loginResult;
+    } else {
+      // 传统方式：使用authCode和idToken调用API
       final loginResult = await apiClient.loginWithApple(
         authCode: result['authCode'] ?? '',
         idToken: result['idToken'],
@@ -260,73 +440,6 @@ class EasyAuth {
       }
 
       return loginResult;
-    } catch (e, stackTrace) {
-      throw auth_exception.AuthenticationException(
-        'Apple login failed: $e',
-        originalError: e,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  /// Apple Web登录
-  Future<LoginResult> loginWithAppleWeb(BuildContext context) async {
-    try {
-      print('🍎 启动Apple Web登录...');
-
-      // 导入WebAppleLoginService
-      final webAppleService = WebAppleLoginService();
-      final result = await webAppleService.signIn(context);
-
-      if (result == null) {
-        throw auth_exception.PlatformException(
-          'User cancelled',
-          platform: 'apple',
-        );
-      }
-
-      print('🔍 Apple Web登录结果: $result');
-
-      // 检查是否是WebView回调结果
-      if (result.containsKey('callbackUrl')) {
-        print('✅ WebView返回回调URL，调用后端登录接口');
-
-        // 使用callback_url调用后端登录接口
-        final callbackUrl = result['callbackUrl'] as String;
-        final platform = result['platform'] as String? ?? 'web';
-
-        final loginResult = await apiClient.loginWithAppleWeb(
-          callbackUrl: callbackUrl,
-          platform: platform,
-        );
-
-        if (loginResult.isSuccess && loginResult.token != null) {
-          await _saveSession(loginResult.token!, loginResult.userInfo);
-        }
-
-        return loginResult;
-      } else {
-        // 传统方式：使用authCode和idToken调用API
-        final platform = _detectPlatform();
-        print('🔍 Apple登录 - 检测到平台: $platform');
-
-        final loginResult = await apiClient.loginWithApple(
-          authCode: result['authCode'] ?? '',
-          idToken: result['idToken'],
-        );
-
-        if (loginResult.isSuccess && loginResult.token != null) {
-          await _saveSession(loginResult.token!, loginResult.userInfo);
-        }
-
-        return loginResult;
-      }
-    } catch (e, stackTrace) {
-      throw auth_exception.AuthenticationException(
-        'Apple Web login failed: $e',
-        originalError: e,
-        stackTrace: stackTrace,
-      );
     }
   }
 
@@ -410,6 +523,33 @@ class EasyAuth {
     } catch (e) {
       print('Token refresh failed: $e');
       await _clearSession();
+    }
+  }
+
+  /// 更新用户信息
+  Future<UserInfo> updateUserInfo({String? nickname, String? avatar}) async {
+    if (_currentToken == null) {
+      throw auth_exception.AuthenticationException('User not logged in');
+    }
+
+    try {
+      final updatedUser = await apiClient.updateUserInfo(
+        token: _currentToken!,
+        nickname: nickname,
+        avatar: avatar,
+      );
+
+      // 更新本地用户信息
+      _currentUser = updatedUser;
+      await _saveUserInfo(updatedUser);
+
+      return updatedUser;
+    } catch (e, stackTrace) {
+      throw auth_exception.AuthenticationException(
+        'Failed to update user info: $e',
+        originalError: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
