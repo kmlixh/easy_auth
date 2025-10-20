@@ -29,6 +29,9 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   /// 获取回调URL
   String _getCallbackUrl() {
     final channelId = widget.channelId ?? 'google'; // 默认为google
+    if (channelId == 'apple') {
+      return 'https://api.janyee.com/user/apple/callback';
+    }
     return 'https://api.janyee.com/user/login/$channelId/callback';
   }
 
