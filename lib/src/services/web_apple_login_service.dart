@@ -2,18 +2,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../widgets/webview_login_dialog.dart';
 
-/// Web Google登录服务
+/// Web Apple登录服务
 /// 使用WebView进行OAuth登录
-class WebGoogleLoginService {
-  static final WebGoogleLoginService _instance =
-      WebGoogleLoginService._internal();
-  factory WebGoogleLoginService() => _instance;
-  WebGoogleLoginService._internal();
+class WebAppleLoginService {
+  static final WebAppleLoginService _instance =
+      WebAppleLoginService._internal();
+  factory WebAppleLoginService() => _instance;
+  WebAppleLoginService._internal();
 
-  /// 启动Web Google登录
+  /// 启动Web Apple登录
   Future<Map<String, dynamic>?> signIn(BuildContext context) async {
     try {
-      print('🌐 启动Web Google登录...');
+      print('🍎 启动Web Apple登录...');
 
       // 构建登录URL
       final loginUrl = _buildLoginUrl();
@@ -22,7 +22,7 @@ class WebGoogleLoginService {
       // 使用WebView进行登录
       return await _showWebViewLogin(context, loginUrl);
     } catch (e) {
-      print('❌ Web Google登录失败: $e');
+      print('❌ Web Apple登录失败: $e');
       rethrow;
     }
   }
@@ -31,7 +31,7 @@ class WebGoogleLoginService {
   String _buildLoginUrl() {
     // 使用正确的API路径
     const baseUrl = 'https://api.janyee.com/user/login';
-    return '$baseUrl/google';
+    return '$baseUrl/apple';
   }
 
   /// 显示WebView登录页面
@@ -48,7 +48,7 @@ class WebGoogleLoginService {
       builder: (BuildContext dialogContext) {
         return WebViewLoginDialog(
           loginUrl: loginUrl,
-          channelId: 'google',
+          channelId: 'apple',
           onResult: (result) {
             completer.complete(result);
           },

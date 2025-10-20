@@ -85,7 +85,8 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
   Future<void> _loginWithApple(BuildContext context) async {
     try {
       print('🍎 开始Apple登录...');
-      final result = await EasyAuth().loginWithApple();
+      // 检测平台，决定使用原生登录还是Web登录
+      final result = await _performAppleLogin(context);
 
       if (result.isSuccess) {
         print('✅ Apple登录成功');
@@ -122,6 +123,18 @@ class EnhancedThirdPartyLoginButtons extends StatelessWidget {
         );
       }
       onLoginFailed?.call(e);
+    }
+  }
+
+  /// 执行Apple登录（根据平台选择登录方式）
+  Future<LoginResult> _performAppleLogin(BuildContext context) async {
+    // 检测平台
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      // iOS平台使用原生Apple登录
+      return await EasyAuth().loginWithApple();
+    } else {
+      // 其他平台使用Web登录
+      return await EasyAuth().loginWithAppleWeb(context);
     }
   }
 

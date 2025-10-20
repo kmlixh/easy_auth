@@ -7,6 +7,7 @@ import 'easy_auth_models.dart';
 import 'easy_auth_api_client.dart';
 import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
+import 'services/web_apple_login_service.dart';
 
 /// EasyAuth核心类 - 纯Flutter包
 /// 提供统一的登录、登出、Token管理功能
@@ -262,6 +263,67 @@ class EasyAuth {
     } catch (e, stackTrace) {
       throw auth_exception.AuthenticationException(
         'Apple login failed: $e',
+        originalError: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Apple Web登录
+  Future<LoginResult> loginWithAppleWeb(BuildContext context) async {
+    try {
+      print('🍎 启动Apple Web登录...');
+
+      // 导入WebAppleLoginService
+      final webAppleService = WebAppleLoginService();
+      final result = await webAppleService.signIn(context);
+
+      if (result == null) {
+        throw auth_exception.PlatformException(
+          'User cancelled',
+          platform: 'apple',
+        );
+      }
+
+      print('🔍 Apple Web登录结果: $result');
+
+      // 检查是否是WebView回调结果
+      if (result.containsKey('callbackUrl')) {
+        print('✅ WebView返回回调URL，调用后端登录接口');
+
+        // 使用callback_url调用后端登录接口
+        final callbackUrl = result['callbackUrl'] as String;
+        final platform = result['platform'] as String? ?? 'web';
+
+        final loginResult = await apiClient.loginWithAppleWeb(
+          callbackUrl: callbackUrl,
+          platform: platform,
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+        }
+
+        return loginResult;
+      } else {
+        // 传统方式：使用authCode和idToken调用API
+        final platform = _detectPlatform();
+        print('🔍 Apple登录 - 检测到平台: $platform');
+
+        final loginResult = await apiClient.loginWithApple(
+          authCode: result['authCode'] ?? '',
+          idToken: result['idToken'],
+        );
+
+        if (loginResult.isSuccess && loginResult.token != null) {
+          await _saveSession(loginResult.token!, loginResult.userInfo);
+        }
+
+        return loginResult;
+      }
+    } catch (e, stackTrace) {
+      throw auth_exception.AuthenticationException(
+        'Apple Web login failed: $e',
         originalError: e,
         stackTrace: stackTrace,
       );

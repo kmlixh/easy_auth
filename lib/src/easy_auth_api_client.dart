@@ -210,6 +210,47 @@ class EasyAuthApiClient {
     );
   }
 
+  /// Apple Web登录（使用回调URL）
+  Future<LoginResult> loginWithAppleWeb({
+    required String callbackUrl,
+    String? platform,
+  }) async {
+    print('📤 [loginWithAppleWeb] Web登录 - 平台: $platform');
+    print('   Callback URL: $callbackUrl');
+
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.directLogin}'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': 'apple',
+        'channel_data': {
+          'callback_url': callbackUrl,
+          'platform': platform ?? 'web',
+        },
+      }),
+    );
+
+    print('📥 [loginWithAppleWeb] Status: ${response.statusCode}');
+    print('📥 [loginWithAppleWeb] Response: ${response.body}');
+
+    final data = _handleResponse(response);
+
+    final token = data['token'] as String?;
+    final userInfo = data['user_info'] as Map<String, dynamic>?;
+
+    if (token == null) {
+      throw EasyAuthException('No token received');
+    }
+
+    return LoginResult(
+      status: LoginStatus.success,
+      token: token,
+      userInfo: userInfo != null ? UserInfo.fromJson(userInfo) : null,
+    );
+  }
+
   /// Google登录（一次性完成，支持多平台）
   /// 需要先通过原生SDK获取authCode
   Future<LoginResult> loginWithGoogle({

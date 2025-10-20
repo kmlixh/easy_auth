@@ -1,17 +1,17 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 /// WebView登录对话框
 class WebViewLoginDialog extends StatefulWidget {
   final String loginUrl;
   final Function(Map<String, dynamic>?) onResult;
+  final String? channelId; // 登录渠道ID，用于确定回调URL
 
   const WebViewLoginDialog({
     Key? key,
     required this.loginUrl,
     required this.onResult,
+    this.channelId,
   }) : super(key: key);
 
   @override
@@ -19,71 +19,145 @@ class WebViewLoginDialog extends StatefulWidget {
 }
 
 class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
-  late final WebViewController _controller;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _initializeWebView();
   }
 
-  void _initializeWebView() {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
-            print('🔍 开始加载: $url');
-          },
-          onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
-            print('✅ 页面加载完成: $url');
+  /// 获取回调URL
+  String _getCallbackUrl() {
+    final channelId = widget.channelId ?? 'google'; // 默认为google
+    return 'https://api.janyee.com/user/login/$channelId/callback';
+  }
 
-            // 检查是否是完整的回调URL（必须以回调URL开头）
-            if (url.startsWith(
-              'https://api.janyee.com/user/login/google/callback',
-            )) {
-              print('✅ 检测到完整回调URL，直接处理登录逻辑');
-              // 直接处理回调，不需要等待页面加载完成
-              _handleCallback(url);
-            }
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            print('🔍 导航请求: ${request.url}');
+  /// 获取标题
+  String _getTitle() {
+    final channelId = widget.channelId ?? 'google';
+    switch (channelId) {
+      case 'apple':
+        return 'Apple 登录';
+      case 'google':
+        return 'Google 登录';
+      default:
+        return '$channelId 登录';
+    }
+  }
 
-            // 检查是否是完整的回调URL（必须以回调URL开头）
-            if (request.url.startsWith(
-              'https://api.janyee.com/user/login/google/callback',
-            )) {
-              print('✅ 检测到完整回调URL，立即处理登录逻辑');
-              // 立即处理回调，不等待页面加载
-              Future.delayed(const Duration(milliseconds: 100), () {
-                _handleCallback(request.url);
-              });
-              return NavigationDecision.navigate;
-            }
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.8,
+        child: Column(
+          children: [
+            // 标题栏
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    _getTitle(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.onResult(null);
+                    },
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            // WebView
+            Expanded(
+              child: Stack(
+                children: [
+                  InAppWebView(
+                    initialUrlRequest: URLRequest(url: WebUri(widget.loginUrl)),
+                    initialSettings: InAppWebViewSettings(
+                      javaScriptEnabled: true,
+                      userAgent:
+                          'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
+                      allowsInlineMediaPlayback: true,
+                      mediaPlaybackRequiresUserGesture: false,
+                    ),
+                    onLoadStart: (controller, url) {
+                      setState(() {
+                        _isLoading = true;
+                      });
+                      print('🔍 开始加载: $url');
+                    },
+                    onLoadStop: (controller, url) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      print('✅ 页面加载完成: $url');
 
-            // 允许所有其他导航
-            return NavigationDecision.navigate;
-          },
-          onWebResourceError: (WebResourceError error) {
-            print('❌ WebView资源错误: ${error.description}');
-            setState(() {
-              _isLoading = false;
-            });
-          },
+                      // 检查是否是完整的回调URL（必须以回调URL开头）
+                      final callbackUrl = _getCallbackUrl();
+                      if (url != null &&
+                          url.toString().startsWith(callbackUrl)) {
+                        print('✅ 检测到完整回调URL，直接处理登录逻辑');
+                        // 直接处理回调，不需要等待页面加载完成
+                        _handleCallback(url.toString());
+                      }
+                    },
+                    onNavigationResponse:
+                        (controller, navigationResponse) async {
+                          final url = navigationResponse.response?.url;
+                          print('🔍 导航响应: $url');
+
+                          // 检查是否是完整的回调URL（必须以回调URL开头）
+                          final callbackUrl = _getCallbackUrl();
+                          if (url != null &&
+                              url.toString().startsWith(callbackUrl)) {
+                            print('✅ 检测到完整回调URL，立即处理登录逻辑');
+                            // 立即处理回调，不等待页面加载
+                            Future.delayed(
+                              const Duration(milliseconds: 100),
+                              () {
+                                _handleCallback(url.toString());
+                              },
+                            );
+                            return NavigationResponseAction.ALLOW;
+                          }
+
+                          // 允许所有其他导航
+                          return NavigationResponseAction.ALLOW;
+                        },
+                    onReceivedError: (controller, request, error) {
+                      print('❌ WebView错误: ${error.description}');
+                      setState(() {
+                        _isLoading = false;
+                      });
+                    },
+                  ),
+                  // 加载指示器
+                  if (_isLoading)
+                    const Center(child: CircularProgressIndicator()),
+                ],
+              ),
+            ),
+          ],
         ),
-      )
-      ..loadRequest(Uri.parse(widget.loginUrl));
+      ),
+    );
   }
 
   void _handleCallback(String url) async {
@@ -133,152 +207,5 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       }
       widget.onResult(null);
     }
-  }
-
-  /// 调用后端API完成登录（传递完整回调URL）
-  Future<Map<String, dynamic>?> _completeLoginWithFullUrl(
-    String callbackUrl,
-  ) async {
-    try {
-      print('🔄 调用后端API完成登录，传递完整回调URL...');
-      print('🔗 回调URL: $callbackUrl');
-
-      final response = await http.post(
-        Uri.parse('https://api.janyee.com/user/login/directLogin'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'tenant_id': 'kiku_app',
-          'scene_id': 'app_native',
-          'channel_id': 'google',
-          'channel_data': {
-            'callback_url': callbackUrl, // 传递完整的回调URL
-            'platform': 'web',
-          },
-        }),
-      );
-
-      print('📥 后端响应: ${response.statusCode} - ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('🔍 后端响应数据: $data');
-        if (data['code'] == 200) {
-          // 修改为200，匹配后端响应
-          print('✅ 后端登录成功');
-          final result = {
-            'callbackUrl': callbackUrl,
-            'platform': 'web',
-            'token': data['data']['token'],
-            'userInfo': data['data']['user_info'],
-          };
-          print('🔍 返回结果: $result');
-          return result;
-        } else {
-          print('❌ 后端登录失败: ${data['msg']}');
-          return null;
-        }
-      } else {
-        print('❌ 后端请求失败: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('❌ 调用后端API失败: $e');
-      return null;
-    }
-  }
-
-  /// 调用后端API完成登录
-  Future<Map<String, dynamic>?> _completeLogin(
-    String code,
-    String? state,
-  ) async {
-    try {
-      print('🔄 调用后端API完成登录...');
-
-      final response = await http.post(
-        Uri.parse('https://api.janyee.com/user/login/directLogin'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'tenant_id': 'kiku_app',
-          'scene_id': 'app_native',
-          'channel_id': 'google',
-          'channel_data': {'code': code, 'state': state, 'platform': 'web'},
-        }),
-      );
-
-      print('📥 后端响应: ${response.statusCode} - ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['code'] == 0) {
-          print('✅ 后端登录成功');
-          return {
-            'authCode': code,
-            'state': state,
-            'platform': 'web',
-            'token': data['data']['token'],
-            'userInfo': data['data']['user_info'],
-          };
-        } else {
-          print('❌ 后端登录失败: ${data['msg']}');
-          return null;
-        }
-      } else {
-        print('❌ 后端请求失败: ${response.statusCode}');
-        return null;
-      }
-    } catch (e) {
-      print('❌ 调用后端API失败: $e');
-      return null;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      child: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            // 标题栏
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300, width: 1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Text(
-                    'Google登录',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      widget.onResult(null);
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            // WebView
-            Expanded(
-              child: Stack(
-                children: [
-                  WebViewWidget(controller: _controller),
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator()),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
