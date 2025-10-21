@@ -23,7 +23,7 @@ class GoogleSignInService {
       print('🔍 Google登录 - 平台: $platform');
 
       // 根据平台选择登录方式
-      if (platform == 'android' || platform == 'ios') {
+      if (platform == 'android' || platform == 'ios' || platform == 'macos') {
         // Android 和 iOS 使用原生登录
         return await _signInNative(tenantConfig);
       } else {
@@ -80,7 +80,7 @@ class GoogleSignInService {
       }
 
       final GoogleSignInAccount googleUser = await GoogleSignIn.instance
-          .authenticate(scopeHint: const <String>['openid']);
+          .authenticate(scopeHint: const <String>['openid','profile','email']);
 
       print('✅ Google登录成功: ${googleUser.email}');
       final GoogleSignInAuthentication auth = await googleUser.authentication;
