@@ -66,7 +66,7 @@ class GoogleSignInService {
 
       print('🔑 使用配置 - clientId: $clientId, serverClientId: $serverClientId');
 
-      // 使用新版本API初始化
+      // 使用新版本API初始化（Android需要serverClientId）
       await GoogleSignIn.instance.initialize(
         clientId: clientId,
         serverClientId: serverClientId,
