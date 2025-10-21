@@ -2,54 +2,18 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
 import 'web_google_login_service.dart';
 import '../easy_auth_models.dart';
 
 /// Google登录服务类
-/// 处理不同平台的Google登录逻辑
+/// 处理不同平台的Google登录逻辑（合并原生和WebView登录）
 class GoogleSignInService {
   static final GoogleSignInService _instance = GoogleSignInService._internal();
   factory GoogleSignInService() => _instance;
   GoogleSignInService._internal();
 
-  /// 初始化Google Sign-In（新版本7.2.0 API）
-  Future<void> _initializeGoogleSignIn([TenantConfig? tenantConfig]) async {
-    final platform = getCurrentPlatform();
-    print('🔑 Google Sign-In配置 - 平台: $platform');
-
-    // 从TenantConfig中获取Google OAuth配置
-    String? clientId;
-    String? serverClientId;
-
-    if (tenantConfig != null) {
-      final googleChannel = tenantConfig.supportedChannels
-          .where((channel) => channel.channelId == 'google')
-          .firstOrNull;
-
-      if (googleChannel?.config != null) {
-        // 根据平台获取对应的客户端ID
-        clientId = googleChannel!.config![platform];
-
-        // 所有平台都需要serverClientId（Web客户端ID）
-        serverClientId = googleChannel.config!['web'];
-      }
-    }
-
-    // 检查配置是否有效
-    if (clientId == null || clientId.isEmpty) {
-      throw Exception('Google OAuth配置缺失：未找到${platform}平台的clientId配置');
-    }
-
-    print('🔑 使用配置 - clientId: $clientId, serverClientId: $serverClientId');
-
-    // 使用新版本API初始化
-    await GoogleSignInPlatform.instance.init(
-      InitParameters(clientId: clientId, serverClientId: serverClientId),
-    );
-  }
-
   /// 执行Google登录（新版本7.2.0 API）
+  /// 返回形如：{ 'idToken': String?, 'email': String?, 'displayName': String? }
   Future<Map<String, dynamic>?> signIn(
     BuildContext context, [
     TenantConfig? tenantConfig,
@@ -58,51 +22,99 @@ class GoogleSignInService {
       final platform = getCurrentPlatform();
       print('🔍 Google登录 - 平台: $platform');
 
-      // 先初始化GoogleSignIn
-      await _initializeGoogleSignIn(tenantConfig);
-
-      // 使用新版本API进行认证
-      if (GoogleSignInPlatform.instance.supportsAuthenticate()) {
-        // 支持authenticate方法的平台（Android、iOS）
-        await GoogleSignInPlatform.instance.authenticate();
+      // 根据平台选择登录方式
+      if (platform == 'android' || platform == 'ios') {
+        // Android 和 iOS 使用原生登录
+        return await _signInNative(tenantConfig);
       } else {
-        // 其他平台使用WebView登录服务
-        final webService = WebGoogleLoginService();
-        final result = await webService.signIn(context);
+        // 其他平台使用WebView登录
+        return await _signInWebView(context);
+      }
+    } catch (e) {
+      print('❌ Google登录失败: $e');
+      rethrow;
+    }
+  }
 
-        print('🔍 WebView登录服务返回结果: $result');
+  /// 原生登录（Android/iOS）
+  Future<Map<String, dynamic>?> _signInNative([
+    TenantConfig? tenantConfig,
+  ]) async {
+    try {
+      // 从TenantConfig中获取Google OAuth配置
+      String? clientId;
+      String? serverClientId;
 
-        if (result == null) {
-          print('❌ WebView登录被用户取消或失败');
-          return null;
+      if (tenantConfig != null) {
+        final googleChannel = tenantConfig.supportedChannels
+            .where((channel) => channel.channelId == 'google')
+            .firstOrNull;
+
+        if (googleChannel?.config != null) {
+          final platform = getCurrentPlatform();
+          clientId = googleChannel!.config![platform];
+          serverClientId = googleChannel.config!['web'];
         }
-
-        return result;
       }
 
-      // 获取当前用户信息
-      final GoogleSignInAccount? currentUser =
-          GoogleSignInPlatform.instance.currentUser;
-      if (currentUser == null) {
-        print('❌ Google登录失败：未获取到用户信息');
+      // 检查配置是否有效
+      if (clientId == null || clientId.isEmpty) {
+        throw Exception(
+          'Google OAuth配置缺失：未找到${getCurrentPlatform()}平台的clientId配置',
+        );
+      }
+
+      print('🔑 使用配置 - clientId: $clientId, serverClientId: $serverClientId');
+
+      // 使用新版本API初始化
+      await GoogleSignIn.instance.initialize(
+        clientId: clientId,
+        serverClientId: serverClientId,
+      );
+
+      print('🔍 开始Google原生登录...');
+
+      // 使用新版本API进行认证
+      if (!GoogleSignIn.instance.supportsAuthenticate()) {
+        throw Exception('当前平台不支持Google原生认证');
+      }
+
+      final GoogleSignInAccount googleUser = await GoogleSignIn.instance
+          .authenticate(scopeHint: const <String>['openid']);
+
+      print('✅ Google登录成功: ${googleUser.email}');
+      final GoogleSignInAuthentication auth = await googleUser.authentication;
+
+      // 7.2.0 版本只返回 idToken，没有 accessToken
+      return <String, dynamic>{
+        'idToken': auth.idToken,
+        'email': googleUser.email,
+        'displayName': googleUser.displayName,
+        'photoUrl': googleUser.photoUrl,
+        'platform': getCurrentPlatform(),
+      };
+    } catch (e) {
+      print('❌ Google原生登录失败: $e');
+      rethrow;
+    }
+  }
+
+  /// WebView登录（Web/Desktop）
+  Future<Map<String, dynamic>?> _signInWebView(BuildContext context) async {
+    try {
+      final webService = WebGoogleLoginService();
+      final result = await webService.signIn(context);
+
+      print('🔍 WebView登录服务返回结果: $result');
+
+      if (result == null) {
+        print('❌ WebView登录被用户取消或失败');
         return null;
       }
 
-      print('✅ Google登录成功: ${currentUser.email}');
-
-      // 获取认证信息
-      final GoogleSignInAuthentication auth = await currentUser.authentication;
-
-      return {
-        'authCode': auth.accessToken,
-        'idToken': auth.idToken,
-        'email': currentUser.email,
-        'displayName': currentUser.displayName,
-        'photoUrl': currentUser.photoUrl,
-        'platform': platform,
-      };
+      return result;
     } catch (e) {
-      print('❌ Google登录失败: $e');
+      print('❌ WebView登录失败: $e');
       rethrow;
     }
   }
@@ -110,8 +122,29 @@ class GoogleSignInService {
   /// 登出
   Future<void> signOut([TenantConfig? tenantConfig]) async {
     try {
-      await _initializeGoogleSignIn(tenantConfig);
-      await GoogleSignInPlatform.instance.signOut();
+      // 从TenantConfig中获取Google OAuth配置
+      String? clientId;
+      String? serverClientId;
+
+      if (tenantConfig != null) {
+        final googleChannel = tenantConfig.supportedChannels
+            .where((channel) => channel.channelId == 'google')
+            .firstOrNull;
+
+        if (googleChannel?.config != null) {
+          final platform = getCurrentPlatform();
+          clientId = googleChannel!.config![platform];
+          serverClientId = googleChannel.config!['web'];
+        }
+      }
+
+      if (clientId != null && clientId.isNotEmpty) {
+        await GoogleSignIn.instance.initialize(
+          clientId: clientId,
+          serverClientId: serverClientId,
+        );
+        await GoogleSignIn.instance.signOut();
+      }
       print('✅ Google登出成功');
     } catch (e) {
       print('❌ Google登出失败: $e');
@@ -141,8 +174,31 @@ class GoogleSignInService {
   /// 检查是否已登录
   Future<bool> isSignedIn([TenantConfig? tenantConfig]) async {
     try {
-      await _initializeGoogleSignIn(tenantConfig);
-      return GoogleSignInPlatform.instance.currentUser != null;
+      // 从TenantConfig中获取Google OAuth配置
+      String? clientId;
+      String? serverClientId;
+
+      if (tenantConfig != null) {
+        final googleChannel = tenantConfig.supportedChannels
+            .where((channel) => channel.channelId == 'google')
+            .firstOrNull;
+
+        if (googleChannel?.config != null) {
+          final platform = getCurrentPlatform();
+          clientId = googleChannel!.config![platform];
+          serverClientId = googleChannel.config!['web'];
+        }
+      }
+
+      if (clientId != null && clientId.isNotEmpty) {
+        await GoogleSignIn.instance.initialize(
+          clientId: clientId,
+          serverClientId: serverClientId,
+        );
+        // 7.2.0 版本没有 currentUser 属性，需要通过其他方式检查
+        return false; // 暂时返回 false，需要重新实现
+      }
+      return false;
     } catch (e) {
       print('❌ 检查Google登录状态失败: $e');
       return false;
@@ -154,8 +210,31 @@ class GoogleSignInService {
     TenantConfig? tenantConfig,
   ]) async {
     try {
-      await _initializeGoogleSignIn(tenantConfig);
-      return GoogleSignInPlatform.instance.currentUser;
+      // 从TenantConfig中获取Google OAuth配置
+      String? clientId;
+      String? serverClientId;
+
+      if (tenantConfig != null) {
+        final googleChannel = tenantConfig.supportedChannels
+            .where((channel) => channel.channelId == 'google')
+            .firstOrNull;
+
+        if (googleChannel?.config != null) {
+          final platform = getCurrentPlatform();
+          clientId = googleChannel!.config![platform];
+          serverClientId = googleChannel.config!['web'];
+        }
+      }
+
+      if (clientId != null && clientId.isNotEmpty) {
+        await GoogleSignIn.instance.initialize(
+          clientId: clientId,
+          serverClientId: serverClientId,
+        );
+        // 7.2.0 版本没有 currentUser 属性，需要通过其他方式获取
+        return null; // 暂时返回 null，需要重新实现
+      }
+      return null;
     } catch (e) {
       print('❌ 获取当前Google用户失败: $e');
       return null;

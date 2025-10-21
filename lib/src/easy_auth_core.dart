@@ -9,7 +9,6 @@ import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
 import 'services/native_apple_login_service.dart';
-import 'services/native_google_login_service.dart';
 import 'services/web_google_login_service.dart';
 import 'package:flutter/services.dart' as services;
 import 'widgets/easy_auth_login_page.dart';
@@ -230,7 +229,7 @@ class EasyAuth {
 
       if (useNative) {
         try {
-          return await _loginWithGoogleNative();
+          return await _loginWithGoogleNative(context);
         } on services.MissingPluginException catch (_) {
           // 原生未实现：自动回退到 Web
           return await _loginWithGoogleWeb(context);
@@ -626,9 +625,9 @@ class EasyAuth {
   }
 
   /// Google原生登录（私有方法）
-  Future<LoginResult> _loginWithGoogleNative() async {
-    // 使用内置原生服务，传递TenantConfig
-    final result = await NativeGoogleLoginService().signIn(_tenantConfig);
+  Future<LoginResult> _loginWithGoogleNative(BuildContext context) async {
+    // 使用合并后的GoogleSignInService
+    final result = await GoogleSignInService().signIn(context, _tenantConfig);
 
     if (result == null) {
       throw auth_exception.PlatformException(
@@ -640,8 +639,8 @@ class EasyAuth {
     final platform = _detectPlatform();
     print('🔍 Google原生登录 - 检测到平台: $platform');
 
+    // 原生登录使用 idToken，不使用 callbackUrl
     final loginResult = await apiClient.loginWithGoogle(
-      authCode: result['authCode'] ?? '',
       idToken: result['idToken'],
       platform: platform,
     );
