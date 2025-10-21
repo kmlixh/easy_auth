@@ -42,7 +42,7 @@ class WebGoogleLoginService {
     final completer = Completer<Map<String, dynamic>?>();
     bool completed = false;
 
-    // 显示WebView对话框
+    // 使用全屏Dialog进行登录
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -50,10 +50,12 @@ class WebGoogleLoginService {
         return WebViewLoginDialog(
           loginUrl: loginUrl,
           channelId: 'google',
+          fullScreen: true, // 使用全屏显示
           onResult: (result) {
             if (!completed) {
               completed = true;
               completer.complete(result);
+              Navigator.of(dialogContext).pop();
             }
           },
         );
