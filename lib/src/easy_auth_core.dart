@@ -9,6 +9,8 @@ import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
 import 'services/native_apple_login_service.dart';
+import 'services/native_google_login_service.dart';
+import 'services/web_google_login_service.dart';
 import 'package:flutter/services.dart' as services;
 import 'widgets/easy_auth_login_page.dart';
 
@@ -221,52 +223,26 @@ class EasyAuth {
   /// Google登录（支持多平台）
   Future<LoginResult> loginWithGoogle(BuildContext context) async {
     try {
-      // 使用Google登录服务
-      final googleService = GoogleSignInService();
-      final result = await googleService.signIn(context);
+      // 平台规则：
+      // - Android => 原生登录（google_sign_in）
+      // - 其他平台（含 Web、iOS、Windows、Linux）=> WebView 登录
+      final useNative = _shouldUseGoogleNative();
 
-      if (result == null) {
-        throw auth_exception.PlatformException(
-          'User cancelled',
-          platform: 'google',
-        );
+      if (useNative) {
+        try {
+          return await _loginWithGoogleNative();
+        } on services.MissingPluginException catch (_) {
+          // 原生未实现：自动回退到 Web
+          return await _loginWithGoogleWeb(context);
+        } catch (e) {
+          print('🔍 Google原生登录失败: $e');
+          // 其他原生错误同样尝试回退到 Web
+          return await _loginWithGoogleWeb(context);
+        }
       }
 
-      // 检查WebView是否返回了callback_url
-      if (result.containsKey('callbackUrl')) {
-        print('✅ WebView返回回调URL，调用后端登录接口');
-
-        // 使用callback_url调用后端登录接口
-        final callbackUrl = result['callbackUrl'] as String;
-        final platform = result['platform'] as String? ?? 'web';
-
-        final loginResult = await apiClient.loginWithGoogle(
-          callbackUrl: callbackUrl,
-          platform: platform,
-        );
-
-        if (loginResult.isSuccess && loginResult.token != null) {
-          await _saveSession(loginResult.token!, loginResult.userInfo);
-        }
-
-        return loginResult;
-      } else {
-        // 传统方式：使用authCode和idToken调用API
-        final platform = _detectPlatform();
-        print('🔍 Google登录 - 检测到平台: $platform');
-
-        final loginResult = await apiClient.loginWithGoogle(
-          authCode: result['authCode'] ?? '',
-          idToken: result['idToken'],
-          platform: platform, // 传递平台信息
-        );
-
-        if (loginResult.isSuccess && loginResult.token != null) {
-          await _saveSession(loginResult.token!, loginResult.userInfo);
-        }
-
-        return loginResult;
-      }
+      // 非 Android 平台使用 WebView
+      return await _loginWithGoogleWeb(context);
     } catch (e, stackTrace) {
       throw auth_exception.AuthenticationException(
         'Google login failed: $e',
@@ -619,6 +595,12 @@ class EasyAuth {
     return isApplePlatform;
   }
 
+  /// 是否应使用 Google 原生登录（Android 一律原生）
+  bool _shouldUseGoogleNative() {
+    final platform = defaultTargetPlatform;
+    return platform == TargetPlatform.android;
+  }
+
   /// Apple原生登录（私有方法）
   Future<LoginResult> _loginWithAppleNative() async {
     // 使用内置原生服务
@@ -641,6 +623,80 @@ class EasyAuth {
     }
 
     return loginResult;
+  }
+
+  /// Google原生登录（私有方法）
+  Future<LoginResult> _loginWithGoogleNative() async {
+    // 使用内置原生服务，传递TenantConfig
+    final result = await NativeGoogleLoginService().signIn(_tenantConfig);
+
+    if (result == null) {
+      throw auth_exception.PlatformException(
+        'User cancelled',
+        platform: 'google',
+      );
+    }
+
+    final platform = _detectPlatform();
+    print('🔍 Google原生登录 - 检测到平台: $platform');
+
+    final loginResult = await apiClient.loginWithGoogle(
+      authCode: result['authCode'] ?? '',
+      idToken: result['idToken'],
+      platform: platform,
+    );
+
+    if (loginResult.isSuccess && loginResult.token != null) {
+      await _saveSession(loginResult.token!, loginResult.userInfo);
+    }
+
+    return loginResult;
+  }
+
+  /// Google Web登录（私有方法）
+  Future<LoginResult> _loginWithGoogleWeb(BuildContext context) async {
+    final webGoogleService = WebGoogleLoginService();
+    final result = await webGoogleService.signIn(context);
+
+    if (result == null) {
+      throw auth_exception.PlatformException(
+        'User cancelled',
+        platform: 'google',
+      );
+    }
+
+    // 检查是否是WebView回调结果
+    if (result.containsKey('callbackUrl')) {
+      final callbackUrl = result['callbackUrl'] as String;
+      final platform = result['platform'] as String? ?? 'web';
+
+      final loginResult = await apiClient.loginWithGoogle(
+        callbackUrl: callbackUrl,
+        platform: platform,
+      );
+
+      if (loginResult.isSuccess && loginResult.token != null) {
+        await _saveSession(loginResult.token!, loginResult.userInfo);
+      }
+
+      return loginResult;
+    } else {
+      // 传统方式：使用authCode和idToken调用API
+      final platform = _detectPlatform();
+      print('🔍 Google Web登录 - 检测到平台: $platform');
+
+      final loginResult = await apiClient.loginWithGoogle(
+        authCode: result['authCode'] ?? '',
+        idToken: result['idToken'],
+        platform: platform,
+      );
+
+      if (loginResult.isSuccess && loginResult.token != null) {
+        await _saveSession(loginResult.token!, loginResult.userInfo);
+      }
+
+      return loginResult;
+    }
   }
 
   /// Apple Web登录（私有方法）
