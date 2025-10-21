@@ -224,8 +224,8 @@ class EasyAuth {
   Future<LoginResult> loginWithGoogle(BuildContext context) async {
     try {
       // 平台规则：
-      // - Android => 原生登录（google_sign_in）
-      // - 其他平台（含 Web、iOS、Windows、Linux）=> WebView 登录
+      // - Android 和 iOS => 原生登录（google_sign_in）
+      // - 其他平台（含 Web、Windows、Linux）=> WebView 登录
       final useNative = _shouldUseGoogleNative();
 
       if (useNative) {
@@ -595,10 +595,10 @@ class EasyAuth {
     return isApplePlatform;
   }
 
-  /// 是否应使用 Google 原生登录（Android 一律原生）
+  /// 是否应使用 Google 原生登录（Android 和 iOS 使用原生）
   bool _shouldUseGoogleNative() {
     final platform = defaultTargetPlatform;
-    return platform == TargetPlatform.android;
+    return platform == TargetPlatform.android || platform == TargetPlatform.iOS;
   }
 
   /// Apple原生登录（私有方法）
