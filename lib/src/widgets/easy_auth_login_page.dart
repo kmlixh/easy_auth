@@ -199,6 +199,11 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
                         isDarkMode,
                         tenantConfig,
                       ),
+
+                      const SizedBox(height: 24),
+
+                      // 隐私声明链接
+                      _buildPrivacyLink(primaryColor, isDarkMode),
                     ],
                   ),
                 ),
@@ -422,6 +427,60 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
             primaryColor: primaryColor,
           ),
       ],
+    );
+  }
+
+  /// 构建隐私声明链接
+  Widget _buildPrivacyLink(Color primaryColor, bool isDarkMode) {
+    return Center(
+      child: GestureDetector(
+        onTap: () => _showPrivacyPolicy(),
+        child: Text(
+          '隐私政策',
+          style: TextStyle(
+            color: primaryColor,
+            fontSize: 14,
+            decoration: TextDecoration.underline,
+            decorationColor: primaryColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 显示隐私政策页面
+  void _showPrivacyPolicy() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('隐私政策'),
+        content: const SingleChildScrollView(
+          child: Text(
+            '我们非常重视您的隐私保护。\n\n'
+            '当您使用我们的登录服务时，我们可能会收集以下信息：\n'
+            '• 手机号码（用于短信验证码登录）\n'
+            '• 邮箱地址（用于邮箱验证码登录）\n'
+            '• 第三方账号信息（微信、QQ、苹果、谷歌等）\n'
+            '• 设备信息（设备型号、操作系统等）\n\n'
+            '我们收集这些信息仅用于：\n'
+            '• 身份验证和账户安全\n'
+            '• 提供登录认证服务\n'
+            '• 防范安全风险\n'
+            '• 改进服务质量\n\n'
+            '我们承诺不会向第三方出售、出租或以其他方式披露您的个人信息，除非获得您的明确同意或法律法规要求。\n\n'
+            '您有权查询、更正、删除您的个人信息，或撤回对个人信息处理的同意。\n\n'
+            '如需查看完整的隐私政策，请访问我们的官方网站。\n\n'
+            '如有任何疑问，请联系我们：privacy@kiku.com',
+            style: TextStyle(fontSize: 14, height: 1.5),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
     );
   }
 }

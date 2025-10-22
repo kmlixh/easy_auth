@@ -80,7 +80,9 @@ class GoogleSignInService {
       }
 
       final GoogleSignInAccount googleUser = await GoogleSignIn.instance
-          .authenticate(scopeHint: const <String>['openid','profile','email']);
+          .authenticate(
+            scopeHint: const <String>['openid', 'profile', 'email'],
+          );
 
       print('✅ Google登录成功: ${googleUser.email}');
       final GoogleSignInAuthentication auth = await googleUser.authentication;
