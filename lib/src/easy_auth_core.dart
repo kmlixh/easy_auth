@@ -223,7 +223,7 @@ class EasyAuth {
     try {
       // 使用Google登录服务
       final googleService = GoogleSignInService();
-      final result = await googleService.signIn(context);
+      final result = await googleService.signIn(context, _tenantConfig);
 
       if (result == null) {
         throw auth_exception.PlatformException(
@@ -737,6 +737,14 @@ class EasyAuth {
     try {
       if (_currentToken != null) {
         await apiClient.logout(_currentToken!);
+      }
+      
+      // 同时登出第三方服务
+      try {
+        final googleService = GoogleSignInService();
+        await googleService.signOut(_tenantConfig);
+      } catch (e) {
+        print('Warning: Google signOut failed: $e');
       }
     } catch (e) {
       print('Warning: Logout API failed: $e');
