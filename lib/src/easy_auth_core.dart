@@ -9,6 +9,7 @@ import 'easy_auth_exception.dart' as auth_exception;
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
 import 'services/native_apple_login_service.dart';
+import 'services/wechat_login_service.dart';
 import 'package:flutter/services.dart' as services;
 import 'widgets/easy_auth_login_page.dart';
 
@@ -21,8 +22,8 @@ class EasyAuth {
   String? _currentToken;
   TenantConfig? _tenantConfig; // 缓存租户配置（含可用登录方式）
 
-  // 第三方登录回调（仅用于微信，Apple 走内置原生服务）
-  Future<Map<String, dynamic>?> Function()? _wechatLoginCallback;
+  // Wechat Service
+  final WechatLoginService _wechatService = WechatLoginService();
 
   static final EasyAuth _instance = EasyAuth._internal();
   factory EasyAuth() => _instance;
@@ -53,7 +54,12 @@ class EasyAuth {
       final config = await apiClient.getTenantConfig();
       _tenantConfig = config; // 缓存一次，供UI直接读取
       // Google登录现在使用Web方式，不需要设置配置
+      _tenantConfig = config; // 缓存一次，供UI直接读取
+      // Google登录现在使用Web方式，不需要设置配置
       await _saveTenantConfigToCache(config);
+
+      // 尝试初始化微信服务（如果有配置）
+      _initWechatServiceIfNeeded(config);
     } catch (e) {
       print('⚠️ 加载租户配置失败: $e');
     }
@@ -67,6 +73,8 @@ class EasyAuth {
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final json = jsonDecode(jsonStr) as Map<String, dynamic>;
         _tenantConfig = TenantConfig.fromJson(json);
+        // 尝试初始化微信服务（如果有缓存配置）
+        _initWechatServiceIfNeeded(_tenantConfig!);
       }
     } catch (e) {
       print('⚠️ 读取租户配置缓存失败: $e');
@@ -133,6 +141,23 @@ class EasyAuth {
 
   /// 是否已登录
   bool get isLoggedIn => _currentToken != null;
+
+  /// 初始化微信服务
+  void _initWechatServiceIfNeeded(TenantConfig config) {
+    try {
+      final wechatParams = config.getChannelParams('wechat');
+      if (wechatParams != null && wechatParams.containsKey('app_id')) {
+        final appId = wechatParams['app_id']!;
+        if (appId.isNotEmpty) {
+           // ignore: discarded_futures
+          _wechatService.init(appId);
+          print('✅ WeChat SDK initialized with AppID: $appId');
+        }
+      }
+    } catch (e) {
+      print('⚠️ Failed to init WeChat service: $e');
+    }
+  }
 
   // ========================================
   // 短信/邮箱登录
@@ -685,24 +710,18 @@ class EasyAuth {
   /// 微信登录
   Future<LoginResult> loginWithWechat() async {
     try {
-      if (_wechatLoginCallback == null) {
-        throw auth_exception.PlatformException(
-          'Wechat login callback not set',
-          platform: 'wechat',
-        );
-      }
-
-      final result = await _wechatLoginCallback!();
-      if (result == null) {
+      // 1. 获取Auth Code
+      final authCode = await _wechatService.login();
+      
+      if (authCode == null) {
         throw auth_exception.PlatformException(
           'User cancelled',
           platform: 'wechat',
         );
       }
 
-      final loginResult = await apiClient.loginWithWechat(
-        result['authCode'] ?? '',
-      );
+      // 2. 调用后端登录
+      final loginResult = await apiClient.loginWithWechat(authCode);
 
       if (loginResult.isSuccess && loginResult.token != null) {
         await _saveSession(loginResult.token!, loginResult.userInfo);
@@ -722,11 +741,6 @@ class EasyAuth {
   // 回调设置
   // ========================================
 
-  void setWechatLoginCallback(
-    Future<Map<String, dynamic>?> Function() callback,
-  ) {
-    _wechatLoginCallback = callback;
-  }
 
   // ========================================
   // 会话管理

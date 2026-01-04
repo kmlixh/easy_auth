@@ -97,12 +97,15 @@ await EasyAuth().init(
 
 ### 4. 微信登录配置
 
+### 4. 微信登录配置
+
 #### iOS配置
 
 **Step 1: 注册微信开放平台**
 1. https://open.weixin.qq.com
 2. 创建移动应用
 3. 获取AppID
+4. **重要**: 设置 Universal Link (iOS 13+ 必需)
 
 **Step 2: 配置Info.plist**
 ```xml
@@ -125,84 +128,47 @@ await EasyAuth().init(
 <array>
   <string>weixin</string>
   <string>weixinULAPI</string>
+  <string>weixinURLParamsAPI</string>
 </array>
+
+<key>NSAppTransportSecurity</key>
+<dict>
+    <key>NSAllowsArbitraryLoads</key>
+    <true/>
+</dict>
 ```
 
-**Step 3: 集成微信SDK（可选，手动配置）**
-
-如需完整功能，需手动集成微信SDK：
-```ruby
-# ios/Podfile
-pod 'WechatOpenSDK'
-```
-
-然后在`EasyAuthPlugin.swift`中实现完整的微信登录逻辑。
+**Step 3: 配置 Associated Domains (Universal Links)**
+在 Xcode 中添加 `Associated Domains` Capability，填入 `applinks:yourdomain.com`。
 
 #### Android配置
 
 **Step 1: 配置AndroidManifest.xml**
 ```xml
-<application>
-  <!-- 微信回调Activity -->
-  <activity
-    android:name=".wxapi.WXEntryActivity"
-    android:exported="true"
-    android:launchMode="singleTask"
-    android:taskAffinity="com.your.package"
-    android:theme="@android:style/Theme.Translucent.NoTitleBar" />
-</application>
-
-<queries>
-  <package android:name="com.tencent.mm" />
-</queries>
-```
-
-**Step 2: 创建WXEntryActivity**
-```kotlin
-// android/app/src/main/kotlin/com/your/package/wxapi/WXEntryActivity.kt
-package com.your.package.wxapi
-
-import android.app.Activity
-import android.os.Bundle
-import com.tencent.mm.opensdk.modelbase.BaseReq
-import com.tencent.mm.opensdk.modelbase.BaseResp
-import com.tencent.mm.opensdk.modelmsg.SendAuth
-import com.tencent.mm.opensdk.openapi.IWXAPIEventHandler
-
-class WXEntryActivity : Activity(), IWXAPIEventHandler {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // 处理微信回调
-        // 将结果通过MethodChannel返回给Flutter
-    }
+<manifest ...>
+    <!-- 允许查询微信包名 -->
+    <queries>
+        <package android:name="com.tencent.mm" />
+    </queries>
     
-    override fun onReq(req: BaseReq?) {}
-    
-    override fun onResp(resp: BaseResp?) {
-        if (resp is SendAuth.Resp) {
-            val code = resp.code
-            // 调用WechatLoginManager.handleWechatCallback(code, null)
-        }
-        finish()
-    }
-}
+    <application ...>
+        <!-- 这里的 WXEntryActivity 由 fluwx 插件自动处理，无需手动创建 -->
+    </application>
+</manifest>
 ```
 
-**Step 3: 集成微信SDK（可选）**
-```gradle
-// android/app/build.gradle
-dependencies {
-    implementation 'com.tencent.mm.opensdk:wechat-sdk-android:6.8.0'
-}
-```
+**Step 2: 签名配置**
+确保你的应用签名MD5/SHA1与微信开放平台填写的完全一致。
 
 #### 使用方法
+EasyAuth 内部集成了 `fluwx`，会自动初始化（前提是任何租户配置中包含 `wechat_app_id`）。
+
 ```dart
 try {
+  // 直接调用即可，会自动拉起微信
   final result = await EasyAuth().loginWithWechat();
   if (result.isSuccess) {
     print('微信登录成功: ${result.token}');
-    print('用户信息: ${result.userInfo}');
   }
 } on PlatformException catch (e) {
   if (e.code == 'APP_NOT_INSTALLED') {
