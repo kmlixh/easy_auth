@@ -30,7 +30,7 @@ class WebAppleLoginService {
   /// 构建登录URL
   String _buildLoginUrl() {
     // 使用正确的API路径
-    const baseUrl = 'https://api.janyee.com/user';
+    const baseUrl = 'https://auth.janyee.com';
     return '$baseUrl/login/apple';
   }
 

@@ -30,7 +30,7 @@ class WebGoogleLoginService {
   /// 构建登录URL
   String _buildLoginUrl() {
     // 使用正确的API路径
-    const baseUrl = 'https://api.janyee.com/user/login';
+    const baseUrl = 'https://auth.janyee.com/login';
     return '$baseUrl/google';
   }
 
