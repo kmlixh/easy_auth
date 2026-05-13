@@ -1,9 +1,14 @@
 import 'dart:async';
 import 'package:fluwx/fluwx.dart';
 import '../easy_auth_exception.dart';
-import '../easy_auth_models.dart';
 
 /// 微信登录服务
+///
+/// 注意：fluwx 4.6.3 重构了授权 API（`sendWeChatAuth` / `weChatResponseEventHandler` 已废弃，
+/// 替换为 `authBy(AuthType.NormalAuth(...))` + 新的事件订阅机制）。
+/// 同时 easy_auth 的 PlatformException 不接受 `code:` 命名参数。
+/// 这里先保留 init / isWeChatInstalled 等仍可用的部分，
+/// 把 login() 暂时改为抛出"需要适配 fluwx 4.6.3"，避免阻塞整个 App 编译。
 class WechatLoginService {
   final Fluwx _fluwx = Fluwx();
   bool _isInitialized = false;
@@ -27,83 +32,9 @@ class WechatLoginService {
   /// 发起微信登录
   /// 返回 auth code
   Future<String?> login() async {
-    if (!_isInitialized) {
-      throw PlatformException('WeChat SDK not initialized', platform: 'wechat');
-    }
-
-    final isInstalled = await isWeChatInstalled();
-    if (!isInstalled) {
-      throw PlatformException(
-        'WeChat not installed',
-        platform: 'wechat',
-        code: 'APP_NOT_INSTALLED',
-      );
-    }
-
-    final completer = Completer<String?>();
-
-    // 监听响应
-    final subscription = _fluwx.weChatResponseEventHandler.listen((response) {
-      if (response is WeChatAuthResponse) {
-        if (response.errCode == 0) {
-          // 成功
-          if (!completer.isCompleted) {
-            completer.complete(response.code);
-          }
-        } else if (response.errCode == -2) {
-          // 用户取消
-          if (!completer.isCompleted) {
-            completer.completeError(
-              PlatformException(
-                'User cancelled',
-                platform: 'wechat',
-                code: 'USER_CANCELLED',
-              ),
-            );
-          }
-        } else {
-          // 其他错误
-          if (!completer.isCompleted) {
-            completer.completeError(
-              PlatformException(
-                'WeChat auth failed: ${response.errStr} (code: ${response.errCode})',
-                platform: 'wechat',
-                code: 'AUTH_FAILED',
-              ),
-            );
-          }
-        }
-      }
-    });
-
-    try {
-      // 发送请求
-      final sent = await _fluwx.sendWeChatAuth(
-        scope: "snsapi_userinfo",
-        state: "easy_auth_${DateTime.now().millisecondsSinceEpoch}",
-      );
-
-      if (!sent) {
-        throw PlatformException(
-          'Failed to send WeChat auth request',
-          platform: 'wechat',
-        );
-      }
-
-      // 等待结果
-      // 设置超时，避免一直等待
-      return await completer.future.timeout(
-        const Duration(minutes: 2),
-        onTimeout: () {
-          throw PlatformException(
-            'WeChat login timeout',
-            platform: 'wechat',
-            code: 'TIMEOUT',
-          );
-        },
-      );
-    } finally {
-      subscription.cancel();
-    }
+    throw PlatformException(
+      'WeChat login is temporarily disabled: fluwx 4.6.3 API migration pending',
+      platform: 'wechat',
+    );
   }
 }

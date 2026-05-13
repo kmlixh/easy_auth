@@ -145,14 +145,18 @@ class EasyAuth {
   /// 初始化微信服务
   void _initWechatServiceIfNeeded(TenantConfig config) {
     try {
-      final wechatParams = config.getChannelParams('wechat');
-      if (wechatParams != null && wechatParams.containsKey('app_id')) {
-        final appId = wechatParams['app_id']!;
-        if (appId.isNotEmpty) {
-           // ignore: discarded_futures
-          _wechatService.init(appId);
-          print('✅ WeChat SDK initialized with AppID: $appId');
+      SupportedChannelInfo? wechatChannel;
+      for (final c in config.supportedChannels) {
+        if (c.channelName == 'wechat') {
+          wechatChannel = c;
+          break;
         }
+      }
+      final appId = wechatChannel?.config?['app_id'];
+      if (appId != null && appId.isNotEmpty) {
+        // ignore: discarded_futures
+        _wechatService.init(appId);
+        print('✅ WeChat SDK initialized with AppID: $appId');
       }
     } catch (e) {
       print('⚠️ Failed to init WeChat service: $e');
