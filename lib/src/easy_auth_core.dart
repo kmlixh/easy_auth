@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'easy_auth_models.dart';
 import 'easy_auth_api_client.dart';
 import 'easy_auth_exception.dart' as auth_exception;
+import 'oauth_redirect.dart';
 import 'services/google_sign_in_service.dart';
 import 'services/web_apple_login_service.dart';
 import 'services/native_apple_login_service.dart';
@@ -343,6 +345,77 @@ class EasyAuth {
           ),
         ) ??
         LoginResult.failure('用户取消登录');
+  }
+
+  /// Stage 5 — OAuth 2.0 Authorization Code + PKCE 登录流。
+  ///
+  /// 与 [loginWithSms] / [loginWithEmail] / [loginWithGoogle] 不同:
+  ///   - 那几个是"嵌入式登录":直接调 anylogin /login/directLogin,得到的是
+  ///     opaque token,只能给 anylogin 自己的 /login/* 用。
+  ///   - 这个是"标准 OAuth 登录":在 webview 里跑 IdP 的 /oauth/authorize
+  ///     流程,拿到的是 ES256 JWT access_token + refresh_token。
+  ///     拿这个 token 调任何接入了 authing.AuthMiddleware 的消费方后端都能通。
+  ///
+  /// [clientId] / [redirectUri] 必须先在 adminFront 的 OAuth 应用管理(Stage 3)
+  /// 里注册。`redirectUri` 推荐用 deep-link(如 `myapp://oauth/cb`),webview
+  /// 在导航时拦截即可,不需要真跳出 app。
+  ///
+  /// [scope] 默认 `openid profile email user_data`。包含 `user_data` 后,
+  /// 该 token 可以读写 /oauth/userdata/:key (Stage 4)。
+  Future<LoginResult> loginWithRedirect({
+    required BuildContext context,
+    required String clientId,
+    required String redirectUri,
+    String scope = 'openid profile email user_data',
+    String? tenantId,
+    Duration timeout = const Duration(minutes: 5),
+  }) async {
+    final cfg = _config;
+    if (cfg == null) {
+      return LoginResult.failure('EasyAuth 未初始化,先调 init(EasyAuthConfig)');
+    }
+    final flow = OAuthRedirectFlow(
+      issuerBaseUrl: cfg.baseUrl.replaceAll(RegExp(r'/$'), ''),
+      clientId: clientId,
+      redirectUri: redirectUri,
+    );
+    try {
+      final result = await flow.start(
+        context: context,
+        scope: scope,
+        tenantId: tenantId ?? cfg.tenantId,
+        timeout: timeout,
+      );
+      // 拉一次 /oauth/userinfo 把基本身份带回来 (避免 UI 还要再调一次)
+      UserInfo? userInfo;
+      try {
+        final resp = await http.get(
+          Uri.parse('${cfg.baseUrl.replaceAll(RegExp(r'/$'), '')}/oauth/userinfo'),
+          headers: {'Authorization': 'Bearer ${result.accessToken}'},
+        );
+        if (resp.statusCode == 200) {
+          final m = jsonDecode(resp.body) as Map<String, dynamic>;
+          userInfo = UserInfo(
+            userId: (m['sub'] as String?) ?? '',
+            nickname: m['nickname'] as String?,
+            avatar: m['avatar'] as String?,
+          );
+        }
+      } catch (_) {
+        // userinfo failure is not fatal — token is still valid.
+      }
+      // 复用现有持久化路径
+      await _saveSession(result.accessToken, userInfo);
+      return LoginResult.success(token: result.accessToken, userInfo: userInfo);
+    } on OAuthRedirectError catch (e) {
+      return LoginResult.failure(e.message);
+    } on TimeoutException catch (_) {
+      return LoginResult.failure('OAuth 登录超时');
+    } catch (e) {
+      return LoginResult.failure('OAuth 登录失败: $e');
+    } finally {
+      flow.close();
+    }
   }
 
   /// 智能处理登录状态（已登录显示用户信息，未登录显示登录页面）
