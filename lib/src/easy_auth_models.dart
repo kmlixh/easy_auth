@@ -45,12 +45,15 @@ class UserInfo {
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(
-      userId: json['user_id'] as String? ?? '',
+      // OIDC userinfo 用 sub,/login/getUserInfo 用 user_id,兼容两种
+      userId: (json['user_id'] as String?) ?? (json['sub'] as String?) ?? '',
       username: json['username'] as String?,
       nickname: json['nickname'] as String?,
+      // OIDC phone scope 给 phone_number;老接口给 phone
       email: json['email'] as String?,
-      phone: json['phone'] as String?,
-      avatar: json['avatar'] as String?,
+      phone: (json['phone'] as String?) ?? (json['phone_number'] as String?),
+      // OIDC 标准是 picture,userLogin 历史叫 avatar,优先标准再 fallback
+      avatar: (json['picture'] as String?) ?? (json['avatar'] as String?),
       extra: json['extra'] as Map<String, dynamic>?,
     );
   }

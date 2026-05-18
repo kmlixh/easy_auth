@@ -395,10 +395,13 @@ class EasyAuth {
         );
         if (resp.statusCode == 200) {
           final m = jsonDecode(resp.body) as Map<String, dynamic>;
+          // 字段名兼容:OIDC 标准是 picture,userLogin 历史叫 avatar。
+          // 后端目前两个都吐(向后兼容),这里优先 picture 跟标准对齐,
+          // 同时 fallback 到 avatar 兜底老服务。
           userInfo = UserInfo(
             userId: (m['sub'] as String?) ?? '',
             nickname: m['nickname'] as String?,
-            avatar: m['avatar'] as String?,
+            avatar: (m['picture'] as String?) ?? (m['avatar'] as String?),
           );
         }
       } catch (_) {
