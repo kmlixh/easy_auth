@@ -239,7 +239,7 @@ class _RedirectCapture {
     if (code == null || code.isEmpty) {
       throw OAuthRedirectError('redirect missing `code`');
     }
-    if (state != expectedState) {
+    if (state == null || state != expectedState) {
       throw OAuthRedirectError(
         'state mismatch — possible CSRF (got $state, want $expectedState)',
       );
