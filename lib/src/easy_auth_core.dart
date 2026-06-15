@@ -27,6 +27,29 @@ class EasyAuth {
   // Wechat Service
   final WechatLoginService _wechatService = WechatLoginService();
 
+  // ==========================================================================
+  // 账号合并事件总线 — 给集成 easy_auth 的业务 app 用
+  //
+  // 业务 app 自己也存按 user_id 索引的业务数据(订单/收藏/聊天/偏好...)。
+  // 当 SDK 内部发生一次合并(resolveBindConflict 完成,或 revertMerge 回滚),
+  // SDK 通过这个 broadcast Stream 把 [MergeEvent] 派发出去,业务 app
+  // listen 一次,在回调里把自己的业务数据迁过去:
+  //
+  //   EasyAuth().onAccountMerge.listen((e) async {
+  //     // 直接用 e.fromUserId / e.toUserId 屏蔽 direction 细节
+  //     await myBackend.reassignOwnership(from: e.fromUserId, to: e.toUserId);
+  //   });
+  //
+  // 用 broadcast 是因为可能有多处 subscribe(本地 db + 远程 server + UI)。
+  // 在 [dispose] 里关闭(SDK 是单例,生命周期=进程,所以一般不调)。
+  // ==========================================================================
+  final StreamController<MergeEvent> _accountMergeController =
+      StreamController<MergeEvent>.broadcast();
+
+  /// 监听账号合并事件 — 业务 app 在 main() / 初始化时 listen 一次即可。
+  /// 详见 [MergeEvent] 的文档示例。
+  Stream<MergeEvent> get onAccountMerge => _accountMergeController.stream;
+
   static final EasyAuth _instance = EasyAuth._internal();
   factory EasyAuth() => _instance;
   EasyAuth._internal();
@@ -1063,6 +1086,10 @@ class EasyAuth {
     );
     // 成功后刷新 currentUser 的 linkedChannels(轻量,失败也不抛)
     if (result is BindOk) {
+      // 派发 merge 事件给消费方 app(在它处理完业务数据迁移前不要继续动 UI)
+      if (result.mergeEvent != null) {
+        _accountMergeController.add(result.mergeEvent!);
+      }
       try {
         await refreshLinkedChannels();
       } catch (_) {}
@@ -1070,12 +1097,17 @@ class EasyAuth {
     return result;
   }
 
-  /// 7 天内回滚一次 merge
-  Future<void> revertMerge(String mergeId) async {
+  /// 7 天内回滚一次 merge — 触发 [onAccountMerge] 派发 direction=revert 事件,
+  /// 业务 app 据此把曾经迁到 target 的数据还回 source
+  Future<MergeEvent?> revertMerge(String mergeId) async {
     if (!isLoggedIn) {
       throw auth_exception.EasyAuthException('not logged in');
     }
-    await apiClient.revertMerge(token: _currentToken!, mergeId: mergeId);
+    final event = await apiClient.revertMerge(token: _currentToken!, mergeId: mergeId);
+    if (event != null) {
+      _accountMergeController.add(event);
+    }
+    return event;
   }
 
   /// 解绑某个渠道。后端会拦截"最后一个登录方式"(返 500 + 提示)。

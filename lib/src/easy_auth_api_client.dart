@@ -460,8 +460,8 @@ class EasyAuthApiClient {
     return BindError(message: 'HTTP $status: $msg');
   }
 
-  /// 7 天内回滚 merge
-  Future<void> revertMerge({
+  /// 7 天内回滚 merge — 返 MergeEvent (direction=revert),消费方据此做反向迁移
+  Future<MergeEvent?> revertMerge({
     required String token,
     required String mergeId,
   }) async {
@@ -470,7 +470,10 @@ class EasyAuthApiClient {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'token': token, 'merge_id': mergeId}),
     );
-    _handleResponse(response);
+    final data = _handleResponse(response);
+    final me = data['merge_event'];
+    if (me is Map<String, dynamic>) return MergeEvent.fromJson(me);
+    return null;
   }
 
   /// 解绑某个渠道(后端会拦截"最后一个登录方式")

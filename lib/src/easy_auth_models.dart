@@ -356,7 +356,11 @@ sealed class BindResult {
     final linked = ((json['linked_channels'] as List?) ?? [])
         .map((e) => LinkedChannel.fromJson(e as Map<String, dynamic>))
         .toList();
-    if (status == 'ok') return BindOk(linkedChannels: linked);
+    // merge_event 只在 resolveBindConflict 真正完成 merge 时出现
+    final mergeEvent = json['merge_event'] != null
+        ? MergeEvent.fromJson(json['merge_event'] as Map<String, dynamic>)
+        : null;
+    if (status == 'ok') return BindOk(linkedChannels: linked, mergeEvent: mergeEvent);
     if (status == 'already_bound') return BindAlreadyBound(linkedChannels: linked);
     if (status == 'conflict') {
       final ct = json['conflict_token'] as String? ?? '';
@@ -372,7 +376,11 @@ sealed class BindResult {
 
 class BindOk extends BindResult {
   final List<LinkedChannel> linkedChannels;
-  const BindOk({required this.linkedChannels});
+  /// 仅当本次是 resolveBindConflict 完成的合并时非 null。
+  /// SDK 会自动 emit 到 [EasyAuth.onAccountMerge],一般业务 app
+  /// 不需要直接读这个字段。
+  final MergeEvent? mergeEvent;
+  const BindOk({required this.linkedChannels, this.mergeEvent});
 }
 
 class BindAlreadyBound extends BindResult {
@@ -410,6 +418,88 @@ enum ResolveAction {
 
   final String wire;
   const ResolveAction(this.wire);
+}
+
+/// 账号合并事件 — 通过 [EasyAuth.onAccountMerge] Stream 分发给消费方 app。
+///
+/// **关键用途**:集成 easy_auth 的业务 app 自己也存了一堆按 user_id 索引的
+/// 业务数据(订单、收藏、聊天、用户偏好...)。当 SDK 触发了一次账号合并,
+/// 业务 app 必须把它自己的数据从 [sourceUserId] 迁到 [targetUserId],
+/// 否则数据会"孤悬"在不再使用的 user_id 下。
+///
+/// 监听方式(应用启动时一次):
+/// ```
+/// EasyAuth().onAccountMerge.listen((event) async {
+///   if (event.direction == MergeDirection.revert) {
+///     // 反操作:把曾经迁到 target 的数据还回 source
+///     await myDb.moveOwner(from: event.targetUserId, to: event.sourceUserId);
+///   } else {
+///     // 正向合并:把 source 的数据迁到 target
+///     await myDb.moveOwner(from: event.sourceUserId, to: event.targetUserId);
+///   }
+///   // 如果同时维护了服务端业务库,也调你自己 server 的 reassign API
+/// });
+/// ```
+///
+/// [revertDeadline] 是 7 天回滚窗口,业务 app 可以在这窗口内只做 soft
+/// reassign(标记 archived 但保留原 owner_user_id),让 [revertMerge] 真正
+/// 干净回退;过期后才做硬 reassign。
+class MergeEvent {
+  final String mergeId;
+  final MergeDirection direction;
+  final String sourceUserId;
+  final String targetUserId;
+  final DateTime mergedAt;
+  final DateTime? revertDeadline;
+
+  MergeEvent({
+    required this.mergeId,
+    required this.direction,
+    required this.sourceUserId,
+    required this.targetUserId,
+    required this.mergedAt,
+    this.revertDeadline,
+  });
+
+  factory MergeEvent.fromJson(Map<String, dynamic> json) {
+    final dirStr = json['direction'] as String? ?? '';
+    return MergeEvent(
+      mergeId: json['merge_id'] as String? ?? '',
+      direction: MergeDirection.values.firstWhere(
+        (d) => d.wire == dirStr,
+        orElse: () => MergeDirection.otherIntoMe,
+      ),
+      sourceUserId: json['source_user_id'] as String? ?? '',
+      targetUserId: json['target_user_id'] as String? ?? '',
+      mergedAt: DateTime.tryParse(json['merged_at'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+      revertDeadline: json['revert_deadline'] != null
+          ? DateTime.tryParse(json['revert_deadline'] as String)
+          : null,
+    );
+  }
+
+  /// 业务 app 真正要迁移的方向: from → to
+  String get fromUserId => direction == MergeDirection.revert ? targetUserId : sourceUserId;
+  String get toUserId => direction == MergeDirection.revert ? sourceUserId : targetUserId;
+
+  @override
+  String toString() => 'MergeEvent($mergeId, $direction, $sourceUserId → $targetUserId)';
+}
+
+/// 合并方向
+enum MergeDirection {
+  /// 对方账号被吞,当前账号留下 — 业务数据从 sourceUserId 迁到 targetUserId
+  otherIntoMe('other_into_me'),
+
+  /// 当前账号被吞,对方留下 — 业务数据从 sourceUserId 迁到 targetUserId,
+  /// 且 SDK 已 logout,客户端会引导用户用对方账号重新登录
+  meIntoOther('me_into_other'),
+
+  /// 一次 merge 的回滚 — 业务数据从 targetUserId 还回 sourceUserId
+  revert('revert');
+
+  final String wire;
+  const MergeDirection(this.wire);
 }
 
 /// token 验证时账号已被合并/注销的异常 — SDK 收到 401 + error_code 时抛
