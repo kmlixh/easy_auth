@@ -244,7 +244,7 @@ class _RedirectCapture {
         'state mismatch — possible CSRF (got $state, want $expectedState)',
       );
     }
-    return _RedirectCapture(code, state);
+    return _RedirectCapture(code, state!);
   }
 }
 

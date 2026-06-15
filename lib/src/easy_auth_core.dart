@@ -158,6 +158,13 @@ class EasyAuth {
     return _apiClient!;
   }
 
+  /// 仅测试用 — 替换 ApiClient 让单测可以注入 MockClient
+  /// 生产代码 (`init` 已经建好 client) 永远不该调这个。
+  @visibleForTesting
+  void setApiClientForTesting(EasyAuthApiClient client) {
+    _apiClient = client;
+  }
+
   /// 当前用户
   UserInfo? get currentUser => _currentUser;
 
