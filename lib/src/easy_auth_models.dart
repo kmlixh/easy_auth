@@ -272,3 +272,166 @@ class TenantConfig {
 
 /// 用户信息页面内的动作
 enum UserInfoAction { none, edited, loggedOut }
+
+// ============================================================================
+// 跨渠道账号绑定 / 合并 (对应后端 binding.go)
+// ============================================================================
+
+/// 当前 user 绑定的某条渠道(channel_user_id 后端已脱敏)
+class LinkedChannel {
+  final String channelId;
+  final String channelName;
+  final String channelUserIdMasked;
+  final String? nickname;
+  final String? sceneId;
+  final DateTime boundAt;
+
+  LinkedChannel({
+    required this.channelId,
+    required this.channelName,
+    required this.channelUserIdMasked,
+    this.nickname,
+    this.sceneId,
+    required this.boundAt,
+  });
+
+  factory LinkedChannel.fromJson(Map<String, dynamic> json) {
+    return LinkedChannel(
+      channelId: json['channel_id'] as String? ?? '',
+      channelName: json['channel_name'] as String? ?? '',
+      channelUserIdMasked: json['channel_user_id_masked'] as String? ?? '',
+      nickname: json['nickname'] as String?,
+      sceneId: json['scene_id'] as String?,
+      boundAt: DateTime.tryParse(json['bound_at'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+/// 冲突对话框里展示的另一边账号摘要(不带原始 user_id,只有 masked)
+class AccountSummary {
+  final String userIdMasked;
+  final String? nickname;
+  final String? avatar;
+  final List<String> boundChannels;
+  final DateTime createdAt;
+
+  AccountSummary({
+    required this.userIdMasked,
+    this.nickname,
+    this.avatar,
+    required this.boundChannels,
+    required this.createdAt,
+  });
+
+  factory AccountSummary.fromJson(Map<String, dynamic> json) {
+    final ch = (json['bound_channels'] as List?)?.map((e) => e.toString()).toList() ?? <String>[];
+    return AccountSummary(
+      userIdMasked: json['user_id_masked'] as String? ?? '',
+      nickname: json['nickname'] as String?,
+      avatar: json['avatar'] as String?,
+      boundChannels: ch,
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+/// 绑定结果 — sealed class,三种形态
+///
+/// SDK 调用方一般这样处理:
+/// ```
+/// switch (await EasyAuth().bindChannelGoogle(ctx)) {
+///   case BindOk(:final linkedChannels): // 成功,更新 UI
+///   case BindAlreadyBound(:final linkedChannels): // 幂等
+///   case BindConflict(:final conflictToken, :final other, :final current):
+///     final action = await showBindConflictDialog(ctx, other, current);
+///     await EasyAuth().resolveBindConflict(conflictToken, action);
+///   case BindError(:final message): // 网络/服务器错误
+/// }
+/// ```
+sealed class BindResult {
+  const BindResult();
+
+  factory BindResult.fromJson(Map<String, dynamic> json, {int httpStatus = 200}) {
+    final status = json['status'] as String? ?? '';
+    final linked = ((json['linked_channels'] as List?) ?? [])
+        .map((e) => LinkedChannel.fromJson(e as Map<String, dynamic>))
+        .toList();
+    if (status == 'ok') return BindOk(linkedChannels: linked);
+    if (status == 'already_bound') return BindAlreadyBound(linkedChannels: linked);
+    if (status == 'conflict') {
+      final ct = json['conflict_token'] as String? ?? '';
+      final other = AccountSummary.fromJson(json['other_user_summary'] as Map<String, dynamic>? ?? {});
+      final me = json['current_user_summary'] != null
+          ? AccountSummary.fromJson(json['current_user_summary'] as Map<String, dynamic>)
+          : null;
+      return BindConflict(conflictToken: ct, other: other, current: me);
+    }
+    return BindError(message: 'unknown bind status: $status (http $httpStatus)');
+  }
+}
+
+class BindOk extends BindResult {
+  final List<LinkedChannel> linkedChannels;
+  const BindOk({required this.linkedChannels});
+}
+
+class BindAlreadyBound extends BindResult {
+  final List<LinkedChannel> linkedChannels;
+  const BindAlreadyBound({required this.linkedChannels});
+}
+
+class BindConflict extends BindResult {
+  /// 15 分钟内可调 resolveBindConflict 解决,过期需要重新发起 bind
+  final String conflictToken;
+  final AccountSummary other;
+  final AccountSummary? current;
+  const BindConflict({
+    required this.conflictToken,
+    required this.other,
+    this.current,
+  });
+}
+
+class BindError extends BindResult {
+  final String message;
+  const BindError({required this.message});
+}
+
+/// 冲突合并方向
+enum ResolveAction {
+  /// 把对方账号吞掉,当前账号留下
+  otherIntoMe('other_into_me'),
+
+  /// 把当前账号吞掉,对方留下(完成后当前 token 失效,需切到对方账号重登)
+  meIntoOther('me_into_other'),
+
+  /// 啥都不做(放弃绑定)
+  abort('abort');
+
+  final String wire;
+  const ResolveAction(this.wire);
+}
+
+/// token 验证时账号已被合并/注销的异常 — SDK 收到 401 + error_code 时抛
+class AccountStateException implements Exception {
+  /// 'account_merged' | 'account_cancelled' | 'user_not_found'
+  final String errorCode;
+
+  /// 若 errorCode='account_merged',这里是 target user_id;
+  /// 客户端可引导用户切到这个 target 重新登录
+  final String? mergedInto;
+
+  final String message;
+
+  AccountStateException({
+    required this.errorCode,
+    this.mergedInto,
+    required this.message,
+  });
+
+  bool get isMerged => errorCode == 'account_merged';
+  bool get isCancelled => errorCode == 'account_cancelled';
+
+  @override
+  String toString() => 'AccountStateException($errorCode${mergedInto != null ? ', mergedInto=$mergedInto' : ''}): $message';
+}

@@ -26,4 +26,11 @@ class EasyAuthApiPaths {
 
   // 租户配置接口
   static const String getTenantConfig = '/login/getTenantConfig';
+
+  // 跨渠道账号绑定 / 合并 (对应 userLogin/binding.go)
+  static const String myChannels = '/login/myChannels';
+  static const String bindChannel = '/login/bindChannel';
+  static const String bindChannelResolve = '/login/bindChannelResolve';
+  static const String revertMerge = '/login/revertMerge';
+  static const String unbindChannel = '/login/unbindChannel';
 }

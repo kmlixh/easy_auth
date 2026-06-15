@@ -937,4 +937,170 @@ class EasyAuth {
     final userInfoStr = jsonEncode(userInfo.toJson());
     await prefs.setString('easy_auth_user_info', userInfoStr);
   }
+
+  // ==========================================================================
+  // 跨渠道账号绑定 / 合并 (对应 userLogin/binding.go)
+  // ==========================================================================
+
+  /// 底层 API:给定 channel_id + channel_data,在当前已登录态下做绑定。
+  ///
+  /// channel_data 的字段约定跟 loginWith* 系列一致 — 例如:
+  ///   sms     → {phone, code}
+  ///   email   → {email, code}
+  ///   wechat  → {code}
+  ///   apple   → {id_token, code}
+  ///   google  → {id_token, code, platform} 等
+  ///
+  /// 返回 [BindResult] sealed family。冲突场景下需要再调 [resolveBindConflict]
+  /// 完成合并。
+  ///
+  /// 错误处理:
+  ///   - 未登录 → 抛 [auth_exception.EasyAuthException]
+  ///   - 当前 token 对应的账号被合并 → 抛 [AccountStateException]
+  Future<BindResult> bindChannel({
+    required String channelId,
+    required Map<String, dynamic> channelData,
+  }) async {
+    if (!isLoggedIn) {
+      throw auth_exception.EasyAuthException('not logged in — bind 需要已登录态');
+    }
+    return apiClient.bindChannel(
+      token: _currentToken!,
+      channelId: channelId,
+      channelData: channelData,
+    );
+  }
+
+  /// SMS 绑定:用户在 UI 输入 phone + code 调进来
+  Future<BindResult> bindChannelSms({
+    required String phoneNumber,
+    required String code,
+  }) =>
+      bindChannel(channelId: 'sms', channelData: {'phone': phoneNumber, 'code': code});
+
+  /// 邮箱绑定
+  Future<BindResult> bindChannelEmail({
+    required String email,
+    required String code,
+  }) =>
+      bindChannel(channelId: 'email', channelData: {'email': email, 'code': code});
+
+  /// 微信绑定:用户先走微信 SDK 拿 authCode 再调进来
+  Future<BindResult> bindChannelWechat({required String authCode}) =>
+      bindChannel(channelId: 'wechat', channelData: {'code': authCode});
+
+  /// Apple 绑定:iOS/macOS 走原生 SDK 拿 idToken,其它平台需要 WebView
+  Future<BindResult> bindChannelApple([BuildContext? context]) async {
+    if (_shouldUseAppleNative()) {
+      final result = await NativeAppleLoginService().signIn();
+      if (result == null) {
+        throw auth_exception.PlatformException('User cancelled', platform: 'apple');
+      }
+      return bindChannel(
+        channelId: 'apple',
+        channelData: {
+          if (result['idToken'] != null) 'id_token': result['idToken'],
+          if (result['authCode'] != null) 'code': result['authCode'],
+        },
+      );
+    }
+    if (context == null) {
+      throw auth_exception.PlatformException(
+        'WebView bind requires BuildContext',
+        platform: 'web',
+      );
+    }
+    final webResult = await WebAppleLoginService().signIn(context);
+    if (webResult == null) {
+      throw auth_exception.PlatformException('User cancelled', platform: 'apple');
+    }
+    return bindChannel(
+      channelId: 'apple',
+      channelData: {
+        if (webResult['idToken'] != null) 'id_token': webResult['idToken'],
+        if (webResult['authCode'] != null) 'code': webResult['authCode'],
+        'platform': 'web',
+      },
+    );
+  }
+
+  /// Google 绑定:复用 loginWithGoogle 的平台分发逻辑(参考其实现)
+  Future<BindResult> bindChannelGoogle(BuildContext context) async {
+    // 这里走和 loginWithGoogle 同样的平台分发,但拿到 token 后调 bind 而不是 directLogin
+    // 实现细节由各 NativeGoogleLoginService / WebGoogleLoginService 提供
+    // — 为了不重复 200 行平台分发代码,直接复用 loginWithGoogle 的结果思路:
+    // 调用方应该先调专用的 collect-channel-data 函数。这里先实现成需要
+    // 调用方自己提供 channel_data 的简化形态。当前 UI 流程通过
+    // [bindChannelWithChannelData] 满足复杂场景。
+    throw UnimplementedError(
+      'bindChannelGoogle: 请先调用 NativeGoogleLoginService.signIn() 拿 idToken,'
+      '再调 bindChannel(channelId: "google", channelData: {...})',
+    );
+  }
+
+  // ------------------------------------------------------------------
+  // 冲突解决 / 回滚 / 解绑 / 查列表
+  // ------------------------------------------------------------------
+
+  /// 完成冲突合并 — 把 [conflictToken] 和 [action] 传回后端
+  ///
+  /// 注意:如果 action=[ResolveAction.meIntoOther],完成后当前 token 失效,
+  /// 客户端应该:
+  ///   1. 提示用户"已合并到 xxx 账号,请重新登录"
+  ///   2. 调用 [logout] 清本地 session
+  ///   3. 引导走对方账号的登录流程
+  Future<BindResult> resolveBindConflict({
+    required String conflictToken,
+    required ResolveAction action,
+  }) async {
+    if (!isLoggedIn) {
+      throw auth_exception.EasyAuthException('not logged in');
+    }
+    final result = await apiClient.resolveBindConflict(
+      token: _currentToken!,
+      conflictToken: conflictToken,
+      action: action,
+    );
+    // 成功后刷新 currentUser 的 linkedChannels(轻量,失败也不抛)
+    if (result is BindOk) {
+      try {
+        await refreshLinkedChannels();
+      } catch (_) {}
+    }
+    return result;
+  }
+
+  /// 7 天内回滚一次 merge
+  Future<void> revertMerge(String mergeId) async {
+    if (!isLoggedIn) {
+      throw auth_exception.EasyAuthException('not logged in');
+    }
+    await apiClient.revertMerge(token: _currentToken!, mergeId: mergeId);
+  }
+
+  /// 解绑某个渠道。后端会拦截"最后一个登录方式"(返 500 + 提示)。
+  Future<void> unbindChannel(String channelId) async {
+    if (!isLoggedIn) {
+      throw auth_exception.EasyAuthException('not logged in');
+    }
+    await apiClient.unbindChannel(token: _currentToken!, channelId: channelId);
+  }
+
+  /// 查当前已登录用户的绑定渠道列表(channel_user_id 脱敏)
+  Future<List<LinkedChannel>> myChannels() async {
+    if (!isLoggedIn) {
+      throw auth_exception.EasyAuthException('not logged in');
+    }
+    return apiClient.myChannels(_currentToken!);
+  }
+
+  /// 刷新内存 / SharedPreferences 里的 [LinkedChannel] 列表
+  /// (绑定 / 解绑 / 合并完成后建议调一次,UI 反映最新状态)
+  ///
+  /// 当前 SDK 的 UserInfo 没有把 linkedChannels 内嵌(避免 OIDC userinfo
+  /// 响应膨胀)。要展示绑定列表请直接调 [myChannels]。
+  Future<void> refreshLinkedChannels() async {
+    // 占位:目前的设计是 myChannels() 即取即用。如果未来要把
+    // linkedChannels 内嵌到 UserInfo,这里就是写入点。
+  }
 }

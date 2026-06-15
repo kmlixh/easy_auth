@@ -391,6 +391,157 @@ class EasyAuthApiClient {
     return TenantConfig.fromJson(data);
   }
 
+  // ==========================================================================
+  // 跨渠道账号绑定 / 合并 (对应 userLogin/binding.go)
+  // ==========================================================================
+
+  /// 通用绑定调用 — 三态返回 (ok / already_bound / conflict)
+  ///
+  /// 与 directLogin 共享 channel_id + channel_data 协议;不同点:
+  ///   - 必须带当前已登录用户的 token (?token=...)
+  ///   - 后端会返 200 (ok / already_bound) 或 409 (conflict)
+  ///   - 都解析成 BindResult
+  Future<BindResult> bindChannel({
+    required String token,
+    required String channelId,
+    required Map<String, dynamic> channelData,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.bindChannel}?token=${Uri.encodeComponent(token)}'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'tenant_id': tenantId,
+        'scene_id': sceneId,
+        'channel_id': channelId,
+        'channel_data': channelData,
+      }),
+    );
+
+    print('📥 [bindChannel] Status: ${response.statusCode}');
+    print('📥 [bindChannel] Response: ${response.body}');
+
+    final (status, body) = _rawJsonResponse(response);
+    _checkAccountState(status, body); // 401 + account_merged 等特殊错误抛 AccountStateException
+
+    // 200(ok/already_bound) 或 409(conflict),body 直接是 BindChannelV2Result 形态
+    if (status == 200 || status == 409) {
+      return BindResult.fromJson(body ?? {}, httpStatus: status);
+    }
+    // 其它都是真错误
+    final msg = body?['message'] as String? ?? body?['msg'] as String? ?? response.body;
+    return BindError(message: 'HTTP $status: $msg');
+  }
+
+  /// 完成冲突合并
+  Future<BindResult> resolveBindConflict({
+    required String token,
+    required String conflictToken,
+    required ResolveAction action,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.bindChannelResolve}'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'token': token,
+        'conflict_token': conflictToken,
+        'action': action.wire,
+      }),
+    );
+
+    print('📥 [resolveBindConflict] Status: ${response.statusCode}');
+    print('📥 [resolveBindConflict] Response: ${response.body}');
+
+    final (status, body) = _rawJsonResponse(response);
+    _checkAccountState(status, body);
+    if (status == 200) {
+      return BindResult.fromJson(body ?? {}, httpStatus: status);
+    }
+    final msg = body?['message'] as String? ?? body?['msg'] as String? ?? response.body;
+    return BindError(message: 'HTTP $status: $msg');
+  }
+
+  /// 7 天内回滚 merge
+  Future<void> revertMerge({
+    required String token,
+    required String mergeId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.revertMerge}'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token, 'merge_id': mergeId}),
+    );
+    _handleResponse(response);
+  }
+
+  /// 解绑某个渠道(后端会拦截"最后一个登录方式")
+  Future<void> unbindChannel({
+    required String token,
+    required String channelId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse(
+        '$baseUrl${EasyAuthApiPaths.unbindChannel}?token=${Uri.encodeComponent(token)}&channel_id=${Uri.encodeComponent(channelId)}',
+      ),
+      headers: {'Content-Type': 'application/json'},
+    );
+    _handleResponse(response);
+  }
+
+  /// 列当前 user 的绑定渠道(channel_user_id 脱敏)
+  Future<List<LinkedChannel>> myChannels(String token) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl${EasyAuthApiPaths.myChannels}?token=${Uri.encodeComponent(token)}'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    final data = _handleResponseAsList(response);
+    return data.map((e) => LinkedChannel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// _rawJsonResponse 不抛异常的 HTTP 解析,给 bind/resolve 用 — 它们要区分
+  /// 200 / 409 / 401 都是合法语义
+  (int, Map<String, dynamic>?) _rawJsonResponse(http.Response response) {
+    Map<String, dynamic>? body;
+    try {
+      body = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (_) {
+      body = null;
+    }
+    return (response.statusCode, body);
+  }
+
+  /// 401 + error_code='account_merged' / 'account_cancelled' / 'user_not_found'
+  /// → 抛 AccountStateException (SDK 上层捕获引导用户去切账号 / 重新登录)
+  void _checkAccountState(int status, Map<String, dynamic>? body) {
+    if (status != 401 || body == null) return;
+    final errorCode = body['error_code'] as String?;
+    if (errorCode == null || errorCode.isEmpty) return;
+    throw AccountStateException(
+      errorCode: errorCode,
+      mergedInto: body['merged_into'] as String?,
+      message: (body['message'] as String?) ?? 'account state invalid',
+    );
+  }
+
+  /// 复用 _handleResponse 的语义,但 data 字段是 List(myChannels 返回数组)
+  List<dynamic> _handleResponseAsList(http.Response response) {
+    Map<String, dynamic>? json;
+    try {
+      json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    } catch (e) {
+      throw EasyAuthException('HTTP ${response.statusCode}: ${response.body}', statusCode: response.statusCode);
+    }
+    _checkAccountState(response.statusCode, json);
+    if (response.statusCode != 200) {
+      final msg = json['msg'] as String? ?? response.body;
+      throw EasyAuthException(msg, statusCode: response.statusCode);
+    }
+    final code = json['code'] as int?;
+    if (code != 0 && code != 200) {
+      throw EasyAuthException(json['msg'] as String? ?? 'unknown', statusCode: code);
+    }
+    return (json['data'] as List<dynamic>?) ?? [];
+  }
+
   /// 处理HTTP响应
   Map<String, dynamic> _handleResponse(http.Response response) {
     // 尝试解析JSON响应
@@ -407,6 +558,10 @@ class EasyAuthApiClient {
         );
       }
     }
+
+    // 401 + error_code='account_merged'/'account_cancelled' → 抛专用异常
+    // 让上层 SDK 能区分"账号本身失效"和"普通服务器错误"
+    _checkAccountState(response.statusCode, json);
 
     // 如果HTTP状态码不是200，尝试从JSON中提取错误信息
     if (response.statusCode != 200) {
