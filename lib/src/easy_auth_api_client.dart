@@ -460,20 +460,39 @@ class EasyAuthApiClient {
     return BindError(message: 'HTTP $status: $msg');
   }
 
-  /// 7 天内回滚 merge — 返 MergeEvent (direction=revert),消费方据此做反向迁移
-  Future<MergeEvent?> revertMerge({
+  // (旧 revertMerge 已删 — 账号合并不可逆)
+
+  /// 上传新头像 — 200x200 PNG 二进制
+  ///
+  /// [pngBytes] 必须是完整的 PNG 文件字节(magic bytes 开头),且解码后必须是 200x200。
+  /// 后端会做尺寸校验,不符合返 400。
+  /// 成功返 `{avatar_etag, avatar_url}`。
+  Future<({String etag, String url})> updateAvatar({
     required String token,
-    required String mergeId,
+    required List<int> pngBytes,
   }) async {
-    final response = await _client.post(
-      Uri.parse('$baseUrl${EasyAuthApiPaths.revertMerge}'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': token, 'merge_id': mergeId}),
-    );
+    final uri = Uri.parse('$baseUrl${EasyAuthApiPaths.updateAvatar}?token=${Uri.encodeComponent(token)}');
+    final req = http.MultipartRequest('POST', uri)
+      ..files.add(http.MultipartFile.fromBytes('file', pngBytes, filename: 'avatar.png'));
+    final streamed = await _client.send(req);
+    final response = await http.Response.fromStream(streamed);
     final data = _handleResponse(response);
-    final me = data['merge_event'];
-    if (me is Map<String, dynamic>) return MergeEvent.fromJson(me);
-    return null;
+    return (
+      etag: data['avatar_etag'] as String? ?? '',
+      url: data['avatar_url'] as String? ?? '',
+    );
+  }
+
+  /// 当前用户头像的完整 URL(给 NetworkImage / Image.network 用)
+  ///
+  /// 后端 GET /user/avatar/:userId 公开访问,自带 ETag + Cache-Control。
+  /// 客户端 cache buster:加 `?etag=xxx` 让头像更新后立即刷新,而不是等 max-age 过期。
+  String avatarUrl(String userId, {String? cacheBuster}) {
+    final base = '$baseUrl${EasyAuthApiPaths.userAvatar(userId)}';
+    if (cacheBuster != null && cacheBuster.isNotEmpty) {
+      return '$base?etag=$cacheBuster';
+    }
+    return base;
   }
 
   /// 解绑某个渠道(后端会拦截"最后一个登录方式")

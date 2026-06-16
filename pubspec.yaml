@@ -22,6 +22,10 @@ dependencies:
   fluwx: ^4.6.1
   # Stage 5 — PKCE SHA256 + base64url helpers for OAuth redirect flow
   crypto: ^3.0.3
+  # UserCenterPage 头像功能 — 选图 / crop 到 200x200 / PNG encode
+  image_picker: ^1.1.2
+  image_cropper: ^8.0.2
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:

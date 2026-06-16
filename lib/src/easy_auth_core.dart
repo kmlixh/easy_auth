@@ -31,7 +31,7 @@ class EasyAuth {
   // 账号合并事件总线 — 给集成 easy_auth 的业务 app 用
   //
   // 业务 app 自己也存按 user_id 索引的业务数据(订单/收藏/聊天/偏好...)。
-  // 当 SDK 内部发生一次合并(resolveBindConflict 完成,或 revertMerge 回滚),
+  // 当 SDK 内部发生一次合并(resolveBindConflict 完成),
   // SDK 通过这个 broadcast Stream 把 [MergeEvent] 派发出去,业务 app
   // listen 一次,在回调里把自己的业务数据迁过去:
   //
@@ -1054,17 +1054,19 @@ class EasyAuth {
     );
   }
 
-  /// Google 绑定:复用 loginWithGoogle 的平台分发逻辑(参考其实现)
+  /// Google 绑定:复用 GoogleSignInService 拿 idToken,再调通用 bindChannel
   Future<BindResult> bindChannelGoogle(BuildContext context) async {
-    // 这里走和 loginWithGoogle 同样的平台分发,但拿到 token 后调 bind 而不是 directLogin
-    // 实现细节由各 NativeGoogleLoginService / WebGoogleLoginService 提供
-    // — 为了不重复 200 行平台分发代码,直接复用 loginWithGoogle 的结果思路:
-    // 调用方应该先调专用的 collect-channel-data 函数。这里先实现成需要
-    // 调用方自己提供 channel_data 的简化形态。当前 UI 流程通过
-    // [bindChannelWithChannelData] 满足复杂场景。
-    throw UnimplementedError(
-      'bindChannelGoogle: 请先调用 NativeGoogleLoginService.signIn() 拿 idToken,'
-      '再调 bindChannel(channelId: "google", channelData: {...})',
+    final result = await GoogleSignInService().signIn(context, _tenantConfig);
+    if (result == null) {
+      throw auth_exception.PlatformException('User cancelled', platform: 'google');
+    }
+    return bindChannel(
+      channelId: 'google',
+      channelData: {
+        if (result['idToken'] != null) 'id_token': result['idToken'],
+        if (result['authCode'] != null) 'code': result['authCode'],
+        if (result['platform'] != null) 'platform': result['platform'],
+      },
     );
   }
 
@@ -1104,17 +1106,25 @@ class EasyAuth {
     return result;
   }
 
-  /// 7 天内回滚一次 merge — 触发 [onAccountMerge] 派发 direction=revert 事件,
-  /// 业务 app 据此把曾经迁到 target 的数据还回 source
-  Future<MergeEvent?> revertMerge(String mergeId) async {
+  // (旧 revertMerge 已删 — 账号合并不可逆)
+
+  /// 上传 200x200 PNG 头像。客户端要先 image_picker 选图 → image_cropper
+  /// crop/resize 到 200x200 → encode 成 PNG 再传 [pngBytes]。
+  ///
+  /// 成功返回头像 URL(已带 etag query),业务 app 把它存到 user.avatar 字段。
+  Future<({String etag, String url})> updateAvatar(List<int> pngBytes) async {
     if (!isLoggedIn) {
       throw auth_exception.EasyAuthException('not logged in');
     }
-    final event = await apiClient.revertMerge(token: _currentToken!, mergeId: mergeId);
-    if (event != null) {
-      _accountMergeController.add(event);
-    }
-    return event;
+    return apiClient.updateAvatar(token: _currentToken!, pngBytes: pngBytes);
+  }
+
+  /// 拼当前用户的头像 URL(GET /user/avatar/:userId),带 etag cache buster。
+  /// 业务 app 用 `Image.network(EasyAuth().myAvatarUrl()!)` 显示即可。
+  String? myAvatarUrl({String? etag}) {
+    final uid = _currentUser?.userId;
+    if (uid == null || uid.isEmpty) return null;
+    return apiClient.avatarUrl(uid, cacheBuster: etag);
   }
 
   /// 解绑某个渠道。后端会拦截"最后一个登录方式"(返 500 + 提示)。

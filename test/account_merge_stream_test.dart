@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:easy_auth/easy_auth.dart';
 
 // ============================================================================
-// 集成测试:resolveBindConflict / revertMerge 收到 merge_event 后,
+// 集成测试:resolveBindConflict 收到 merge_event 后,
 // EasyAuth().onAccountMerge Stream 必须把事件派发出来
 //
 // 这条链路是消费方 app 业务数据迁移的唯一信号源,断不得。
@@ -141,58 +141,7 @@ void main() {
     await sub.cancel();
   });
 
-  test('revertMerge 收到 direction=revert → fromUserId/toUserId 翻转', () async {
-    final mockClient = MockClient((req) async {
-      expect(req.url.path, '/login/revertMerge');
-      return http.Response(
-        jsonEncode({
-          'code': 0,
-          'msg': 'ok',
-          'data': {
-            'ok': true,
-            'merge_event': {
-              'merge_id': 'm-test-2',
-              'direction': 'revert',
-              'source_user_id': 'src',
-              'target_user_id': 'tgt',
-              'merged_at': '2026-06-15T10:00:00Z',
-            },
-          },
-        }),
-        200,
-        headers: {'content-type': 'application/json'},
-      );
-    });
-
-    await EasyAuth().init(EasyAuthConfig(
-      baseUrl: 'http://test',
-      tenantId: 'kiku',
-      sceneId: 'app_native',
-    ));
-    EasyAuth().setApiClientForTesting(EasyAuthApiClient(
-      baseUrl: 'http://test',
-      tenantId: 'kiku',
-      sceneId: 'app_native',
-      httpClient: mockClient,
-    ));
-
-    final received = <MergeEvent>[];
-    final sub = EasyAuth().onAccountMerge.listen(received.add);
-
-    final event = await EasyAuth().revertMerge('m-test-2');
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-
-    expect(event, isNotNull);
-    expect(event!.direction, MergeDirection.revert);
-    // 业务 app 视角:revert 时 from/to 翻转,数据从 target 还回 source
-    expect(event.fromUserId, 'tgt');
-    expect(event.toUserId, 'src');
-
-    expect(received.length, 1);
-    expect(received.first.direction, MergeDirection.revert);
-
-    await sub.cancel();
-  });
+  // (旧 revertMerge 测试已删 — 账号合并改为不可逆,SDK 不再提供 revertMerge 方法)
 
   test('401 + error_code=account_merged → AccountStateException with mergedInto', () async {
     final mockClient = MockClient((req) async {

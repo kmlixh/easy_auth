@@ -31,6 +31,10 @@ class EasyAuthApiPaths {
   static const String myChannels = '/login/myChannels';
   static const String bindChannel = '/login/bindChannel';
   static const String bindChannelResolve = '/login/bindChannelResolve';
-  static const String revertMerge = '/login/revertMerge';
   static const String unbindChannel = '/login/unbindChannel';
+
+  // 头像 (PNG 200x200, BYTEA 直存)
+  static const String updateAvatar = '/login/updateAvatar';
+  // GET /user/avatar/:userId  (公开,带 ETag/Cache-Control)
+  static String userAvatar(String userId) => '/user/avatar/$userId';
 }

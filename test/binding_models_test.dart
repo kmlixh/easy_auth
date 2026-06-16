@@ -19,7 +19,6 @@ void main() {
       expect(e.direction, MergeDirection.otherIntoMe);
       expect(e.sourceUserId, 'src');
       expect(e.targetUserId, 'tgt');
-      expect(e.revertDeadline, isNotNull);
       // 业务 app 用 fromUserId / toUserId 屏蔽 direction 细节
       expect(e.fromUserId, 'src');
       expect(e.toUserId, 'tgt');
@@ -37,21 +36,18 @@ void main() {
       // me_into_other 时 source 仍是被吞的一方 — from/to 不变
       expect(e.fromUserId, 'src');
       expect(e.toUserId, 'tgt');
-      expect(e.revertDeadline, isNull);
     });
 
-    test('revert direction flips from/to for consumer app', () {
+    test('fromUserId / toUserId 始终等价于 sourceUserId / targetUserId (合并不可逆)', () {
       final e = MergeEvent.fromJson({
         'merge_id': 'm3',
-        'direction': 'revert',
+        'direction': 'me_into_other',
         'source_user_id': 'src',
         'target_user_id': 'tgt',
         'merged_at': '2026-06-15T10:00:00Z',
       });
-      expect(e.direction, MergeDirection.revert);
-      // 回滚时业务 app 应该把数据从 target 还回 source — fromUserId/toUserId 翻转
-      expect(e.fromUserId, 'tgt');
-      expect(e.toUserId, 'src');
+      expect(e.fromUserId, 'src');
+      expect(e.toUserId, 'tgt');
     });
 
     test('falls back to otherIntoMe on unknown direction string', () {
@@ -71,7 +67,6 @@ void main() {
       expect(e.sourceUserId, '');
       expect(e.targetUserId, '');
       expect(e.mergedAt.millisecondsSinceEpoch, 0);
-      expect(e.revertDeadline, isNull);
     });
   });
 
@@ -283,7 +278,6 @@ void main() {
     test('MergeDirection.wire matches backend contract', () {
       expect(MergeDirection.otherIntoMe.wire, 'other_into_me');
       expect(MergeDirection.meIntoOther.wire, 'me_into_other');
-      expect(MergeDirection.revert.wire, 'revert');
     });
   });
 }

@@ -427,30 +427,25 @@ enum ResolveAction {
 /// 业务 app 必须把它自己的数据从 [sourceUserId] 迁到 [targetUserId],
 /// 否则数据会"孤悬"在不再使用的 user_id 下。
 ///
+/// **合并不可逆** — 一旦触发就是终态,没有 revert / 软迁移窗口。业务 app
+/// 应该直接做硬迁移(`UPDATE ... SET user_id = target WHERE user_id = source`)。
+///
 /// 监听方式(应用启动时一次):
 /// ```
 /// EasyAuth().onAccountMerge.listen((event) async {
-///   if (event.direction == MergeDirection.revert) {
-///     // 反操作:把曾经迁到 target 的数据还回 source
-///     await myDb.moveOwner(from: event.targetUserId, to: event.sourceUserId);
-///   } else {
-///     // 正向合并:把 source 的数据迁到 target
-///     await myDb.moveOwner(from: event.sourceUserId, to: event.targetUserId);
-///   }
-///   // 如果同时维护了服务端业务库,也调你自己 server 的 reassign API
+///   await myBackend.reassignOwnership(
+///     fromUserId: event.fromUserId,
+///     toUserId:   event.toUserId,
+///     mergeId:    event.mergeId,  // 业务后端用它做幂等
+///   );
 /// });
 /// ```
-///
-/// [revertDeadline] 是 7 天回滚窗口,业务 app 可以在这窗口内只做 soft
-/// reassign(标记 archived 但保留原 owner_user_id),让 [revertMerge] 真正
-/// 干净回退;过期后才做硬 reassign。
 class MergeEvent {
   final String mergeId;
   final MergeDirection direction;
   final String sourceUserId;
   final String targetUserId;
   final DateTime mergedAt;
-  final DateTime? revertDeadline;
 
   MergeEvent({
     required this.mergeId,
@@ -458,7 +453,6 @@ class MergeEvent {
     required this.sourceUserId,
     required this.targetUserId,
     required this.mergedAt,
-    this.revertDeadline,
   });
 
   factory MergeEvent.fromJson(Map<String, dynamic> json) {
@@ -472,31 +466,25 @@ class MergeEvent {
       sourceUserId: json['source_user_id'] as String? ?? '',
       targetUserId: json['target_user_id'] as String? ?? '',
       mergedAt: DateTime.tryParse(json['merged_at'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
-      revertDeadline: json['revert_deadline'] != null
-          ? DateTime.tryParse(json['revert_deadline'] as String)
-          : null,
     );
   }
 
   /// 业务 app 真正要迁移的方向: from → to
-  String get fromUserId => direction == MergeDirection.revert ? targetUserId : sourceUserId;
-  String get toUserId => direction == MergeDirection.revert ? sourceUserId : targetUserId;
+  /// (保留这两个 getter 为了 API 稳定 — 跟 sourceUserId/targetUserId 等价)
+  String get fromUserId => sourceUserId;
+  String get toUserId => targetUserId;
 
   @override
   String toString() => 'MergeEvent($mergeId, $direction, $sourceUserId → $targetUserId)';
 }
 
-/// 合并方向
+/// 合并方向 — 仅记录"谁吞谁",不影响数据迁移方向(永远是 source → target)
 enum MergeDirection {
-  /// 对方账号被吞,当前账号留下 — 业务数据从 sourceUserId 迁到 targetUserId
+  /// 对方账号被吞,当前账号留下
   otherIntoMe('other_into_me'),
 
-  /// 当前账号被吞,对方留下 — 业务数据从 sourceUserId 迁到 targetUserId,
-  /// 且 SDK 已 logout,客户端会引导用户用对方账号重新登录
-  meIntoOther('me_into_other'),
-
-  /// 一次 merge 的回滚 — 业务数据从 targetUserId 还回 sourceUserId
-  revert('revert');
+  /// 当前账号被吞,对方留下 — SDK 已 logout,客户端会引导用户用对方账号重新登录
+  meIntoOther('me_into_other');
 
   final String wire;
   const MergeDirection(this.wire);
