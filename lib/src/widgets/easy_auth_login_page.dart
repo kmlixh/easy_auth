@@ -23,29 +23,43 @@ class EasyAuthLoginPage extends StatefulWidget {
 
 class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
   bool _submitting = false; // 登录中的遮罩
-  Timer? _configCheckTimer;
   bool _completedPop = false; // 防止重复关闭导致返回值异常
+
+  // 租户配置加载状态 — 跟 EasyAuth().tenantConfig 一起决定 UI 分支
+  bool _loadingConfig = false;
+  Object? _configError;
 
   @override
   void initState() {
     super.initState();
-    // 定期检查配置是否加载完成
-    _configCheckTimer = Timer.periodic(const Duration(milliseconds: 500), (
-      timer,
-    ) {
-      if (EasyAuth().tenantConfig != null) {
-        timer.cancel();
-        if (mounted) {
-          setState(() {});
-        }
-      }
-    });
+    // 如果 init() 时已经拉到缓存 / 后台已加载完,直接用现成的;
+    // 否则主动拉一次(带 10 秒超时),失败就显示重试按钮 — 不再被动等 timer
+    if (EasyAuth().tenantConfig == null) {
+      _kickoffConfigLoad();
+    }
   }
 
-  @override
-  void dispose() {
-    _configCheckTimer?.cancel();
-    super.dispose();
+  Future<void> _kickoffConfigLoad() async {
+    if (!mounted) return;
+    setState(() {
+      _loadingConfig = true;
+      _configError = null;
+    });
+    try {
+      await EasyAuth()
+          .reloadTenantConfig()
+          .timeout(const Duration(seconds: 10),
+              onTimeout: () =>
+                  throw TimeoutException('加载租户配置超时,请检查网络'));
+      if (!mounted) return;
+      setState(() => _loadingConfig = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingConfig = false;
+        _configError = e;
+      });
+    }
   }
 
   /// 处理登录成功
@@ -103,8 +117,8 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
     Color surfaceColor,
     bool isDarkMode,
   ) {
-    // 如果配置为空，显示加载状态
-    if (tenantConfig == null) {
+    // 配置还在加载 — 显示菊花 + 文案
+    if (tenantConfig == null && _loadingConfig) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -118,6 +132,53 @@ class _EasyAuthLoginPageState extends State<EasyAuthLoginPage> {
               ),
             ),
           ],
+        ),
+      );
+    }
+
+    // 配置加载失败 — 显示错误 + 重试 + 关闭 (不再死循环卡死)
+    if (tenantConfig == null) {
+      final err = _configError;
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.cloud_off,
+                  size: 56, color: isDarkMode ? Colors.red[300] : Colors.red[600]),
+              const SizedBox(height: 16),
+              Text(
+                '登录配置加载失败',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                err?.toString() ?? '请稍后再试',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _kickoffConfigLoad,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新加载'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(context)
+                    .pop<LoginResult>(LoginResult.failure('用户取消登录')),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
         ),
       );
     }

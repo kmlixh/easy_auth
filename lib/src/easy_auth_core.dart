@@ -73,18 +73,23 @@ class EasyAuth {
     _refreshTenantConfigInBackground();
   }
 
-  /// 加载租户配置
+  /// 加载租户配置 — 抛错的版本(给 UI 重试用)
+  ///
+  /// 成功时:写 _tenantConfig + 落 cache + 初始化微信
+  /// 失败时:抛 EasyAuthException,**让上层决定怎么显示**(LoginPage 会展示重试按钮)
+  Future<TenantConfig> reloadTenantConfig() async {
+    final config = await apiClient.getTenantConfig();
+    _tenantConfig = config;
+    await _saveTenantConfigToCache(config);
+    _initWechatServiceIfNeeded(config);
+    return config;
+  }
+
+  /// 加载租户配置 — 兼容旧名,内部走 [reloadTenantConfig] 但吞错
+  /// (init() 的后台刷新用,失败也不阻塞启动)
   Future<void> _loadTenantConfig() async {
     try {
-      final config = await apiClient.getTenantConfig();
-      _tenantConfig = config; // 缓存一次，供UI直接读取
-      // Google登录现在使用Web方式，不需要设置配置
-      _tenantConfig = config; // 缓存一次，供UI直接读取
-      // Google登录现在使用Web方式，不需要设置配置
-      await _saveTenantConfigToCache(config);
-
-      // 尝试初始化微信服务（如果有配置）
-      _initWechatServiceIfNeeded(config);
+      await reloadTenantConfig();
     } catch (e) {
       print('⚠️ 加载租户配置失败: $e');
     }
