@@ -7,17 +7,27 @@ import 'easy_auth_api_paths.dart';
 /// EasyAuth API客户端
 /// 负责与anylogin后端服务通信
 class EasyAuthApiClient {
+  /// 归一化:末尾 `/` 移除,避免拼路径时产生 `//login/...` 双斜杠
+  /// (nginx 默认 merge_slashes off 时双斜杠会 404 / 不规范 redirect)
   final String baseUrl;
   final String tenantId;
   final String sceneId;
   final http.Client? httpClient;
 
   EasyAuthApiClient({
-    required this.baseUrl,
+    required String baseUrl,
     required this.tenantId,
     required this.sceneId,
     this.httpClient,
-  });
+  }) : baseUrl = _normalizeBaseUrl(baseUrl);
+
+  static String _normalizeBaseUrl(String raw) {
+    var s = raw.trim();
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
 
   http.Client get _client => httpClient ?? http.Client();
 
@@ -594,13 +604,22 @@ class EasyAuthApiClient {
     // HTTP 200，检查业务code
     final code = json?['code'] as int?;
 
-    // 兼容 code: 0 和 code: 200 两种成功响应
-    if (code != 0 && code != 200) {
+    // 兼容三种成功语义:
+    //   - 标准 fiber 包装 {code:0, ...}
+    //   - 老接口 {code:200, ...}
+    //   - 直接平铺 {tenant_id:..., supported_channels:...} (无 code 字段)
+    //     ← 之前 bug: code == null 时会进 if 抛 'Unknown error',把正常响应当业务错
+    if (code != null && code != 0 && code != 200) {
       final msg = json?['msg'] as String? ?? 'Unknown error';
       throw EasyAuthException(msg, statusCode: code);
     }
 
-    return json?['data'] as Map<String, dynamic>? ?? {};
+    // 数据字段:
+    //   - 标准包装时,业务数据在 json['data'] 子对象
+    //   - 平铺响应时,业务数据就是 json 本身(没有 data 字段)
+    final dataField = json?['data'];
+    if (dataField is Map<String, dynamic>) return dataField;
+    return json ?? {};
   }
 
   /// 关闭HTTP客户端
