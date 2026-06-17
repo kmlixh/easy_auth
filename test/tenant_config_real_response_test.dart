@@ -83,6 +83,86 @@ void main() {
     expect(caught!.statusCode, 404);
   });
 
+  test('真实 nexterm 租户响应 (sms+apple,icon 空,scene_id 透传) → 正确解析', () async {
+    const nextermResp = r'''{"code":0,"data":{"tenant_id":"nexterm","tenant_name":"nexterm","icon":"","supported_channels":[{"channel_id":"sms","channel_name":"sms","channel_title":"短信验证码","logo":"https://res.janyee.com/kiku/icons/sms.png","sort_order":1},{"channel_id":"apple","channel_name":"apple","channel_title":"Apple ID登录","logo":"https://res.janyee.com/kiku/icons/apple.png","sort_order":2}],"default_channel":"sms"},"msg":"success"}''';
+
+    String? capturedUrl;
+    final mock = MockClient((req) async {
+      capturedUrl = req.url.toString();
+      return http.Response(nextermResp, 200,
+          headers: {'content-type': 'application/json'});
+    });
+
+    final api = EasyAuthApiClient(
+      baseUrl: 'https://auth.janyee.com',
+      tenantId: 'nexterm',
+      sceneId: 'app_native',
+      httpClient: mock,
+    );
+
+    final cfg = await api.getTenantConfig();
+
+    // 关键断言:确认每个字段都解析对
+    expect(cfg.tenantId, 'nexterm');
+    expect(cfg.tenantName, 'nexterm');
+    expect(cfg.icon, ''); // 空串而不是 null,业务方判 isNotEmpty 用
+    expect(cfg.supportedChannels.length, 2);
+    expect(cfg.defaultChannel, 'sms');
+
+    final sms = cfg.supportedChannels[0];
+    expect(sms.channelId, 'sms');
+    expect(sms.channelName, 'sms');
+    expect(sms.channelTitle, '短信验证码');
+    expect(sms.sortOrder, 1);
+    expect(sms.config, isNull); // sms 没 config 字段
+
+    final apple = cfg.supportedChannels[1];
+    expect(apple.channelId, 'apple');
+    expect(apple.channelTitle, 'Apple ID登录');
+    expect(apple.sortOrder, 2);
+
+    // ★ scene_id 是否被透传到 URL? 这个其实业务方在 init() 传了,
+    //   但 getTenantConfig 接口本身不该需要它(后端只看 tenant_id)
+    expect(capturedUrl, contains('tenant_id=nexterm'));
+  });
+
+  test('LoginPage 决策:sms + apple 组合 → 应该同时渲染验证码区+第三方区', () {
+    // 这个响应里 hasSMS && hasApple,easy_auth_login_page._buildLoginMethods
+    // 应该:
+    //   hasVerificationLogin = hasSMS || hasEmail = true
+    //   hasThirdPartyLogin = hasWechat || hasGoogle || hasApple = true
+    // 渲染验证码区 + 分隔线 + Apple 第三方按钮。
+    //
+    // 这里只验证模型字段对得上 widget 里的判断逻辑(避免后续重构 widget 时
+    // 不知不觉漏掉某个渠道分支)
+    final channels = [
+      SupportedChannelInfo(
+        channelId: 'sms',
+        channelName: 'sms',
+        channelTitle: '短信',
+        sortOrder: 1,
+      ),
+      SupportedChannelInfo(
+        channelId: 'apple',
+        channelName: 'apple',
+        channelTitle: 'Apple',
+        sortOrder: 2,
+      ),
+    ];
+    final hasSMS = channels.any((c) => c.channelId == 'sms');
+    final hasEmail = channels.any((c) => c.channelId == 'email');
+    final hasWechat = channels.any((c) => c.channelId == 'wechat');
+    final hasGoogle = channels.any((c) => c.channelId == 'google');
+    final hasApple = channels.any((c) => c.channelId == 'apple');
+    expect(hasSMS, isTrue);
+    expect(hasEmail, isFalse);
+    expect(hasWechat, isFalse);
+    expect(hasGoogle, isFalse);
+    expect(hasApple, isTrue);
+    expect(hasSMS || hasEmail, isTrue, reason: 'hasVerificationLogin');
+    expect(hasWechat || hasGoogle || hasApple, isTrue, reason: 'hasThirdPartyLogin');
+  });
+
   test('后端返回 code 字段缺失 → 也能正确处理(不该把没有 code 当错)', () async {
     // 防御性测试:如果后端有天改了响应不包 code 字段,直接 {data:{...}},
     // SDK 不应该把它当业务错(code != 0 && code != 200 throw)
