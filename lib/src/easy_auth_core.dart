@@ -723,18 +723,33 @@ class EasyAuth {
     if (useNative) {
       try {
         return await _loginWithAppleNative();
-      } on services.MissingPluginException catch (_) {
-        // 原生未实现：自动回退到 Web（需有 context）
-        if (context != null) {
-          return await _loginWithAppleWeb(context);
-        }
+      } on services.MissingPluginException catch (e) {
+        // 原生插件未注册 — 极少见(sign_in_with_apple 没装好)
+        print('🍎 [native-apple] MissingPluginException: $e');
+        if (context != null) return await _loginWithAppleWeb(context);
         rethrow;
-      } catch (e) {
-        print('🍎 Apple原生登录失败: $e');
-        // 其他原生错误同样尝试回退到 Web
-        if (context != null) {
-          return await _loginWithAppleWeb(context);
+      } on services.PlatformException catch (e) {
+        // 这是最常见的 native 失败路径(macOS 缺 entitlement / iOS 缺 Capability)
+        //   code='1000' / domain='AKAuthenticationError' = 用户取消,不该兜底
+        //   code='1001' / authorizedOperation 失败 = 系统拒绝
+        //   code='AuthenticationServices' + canceled-by-user = 用户取消
+        //   其他都很可能是配置缺失,打详细 log 帮业务方诊断
+        print('🍎 [native-apple] PlatformException: code=${e.code} '
+            'message=${e.message} details=${e.details}');
+        final cancelled =
+            (e.code == '1000' || (e.message ?? '').toLowerCase().contains('cancel'));
+        if (cancelled) {
+          // 用户主动取消 → 不要回落 web
+          throw auth_exception.PlatformException('User cancelled', platform: 'apple');
         }
+        // 配置缺失 / 系统拒绝 → 回落 web,但打条提醒
+        print('🍎 [native-apple] 可能是 macOS / iOS 缺 Sign in with Apple '
+            'entitlement;回落到 WebView 登录。详细配置见 SETUP_GUIDE。');
+        if (context != null) return await _loginWithAppleWeb(context);
+        rethrow;
+      } catch (e, st) {
+        print('🍎 [native-apple] 未知错误: $e\n$st');
+        if (context != null) return await _loginWithAppleWeb(context);
         rethrow;
       }
     }

@@ -179,46 +179,111 @@ try {
 }
 ```
 
-### 5. Apple ID登录配置（仅iOS）
+### 5. Apple ID 登录配置（iOS + macOS）
 
-#### 系统要求
-- **iOS 13.0+**
-- Xcode 11+
+> **关键**:iOS 跟 macOS 的配置**不一样**。macOS 多一道 entitlements + sandbox 步骤,缺了 SDK 会安静回落到 WebView 登录(看 Flutter console 找 `🍎 [native-apple]` 开头的 log 自查)。
 
-#### 配置步骤
+#### 5.1 通用前置:Apple Developer Portal
 
-**Step 1: 在Xcode中启用Capability**
+1. https://developer.apple.com → Identifiers
+2. 找到你的 App ID,Edit
+3. 勾选 **Sign In with Apple** capability
+4. 重新生成 / 下载 provisioning profile
+
+#### 5.2 iOS 配置(Xcode)
+
 ```
-1. 打开ios/Runner.xcworkspace
-2. 选择Runner target
+1. 打开 ios/Runner.xcworkspace
+2. 选择 Runner target
+3. Signing & Capabilities 标签
+4. 点击 + Capability
+5. 添加 "Sign in with Apple"
+```
+
+最低系统:iOS 13.0+,Xcode 11+。
+
+#### 5.3 macOS 配置(★ 比 iOS 多两步)
+
+**Step 1**: Xcode 加 Capability(同 iOS,但选 macOS target)
+```
+1. 打开 macos/Runner.xcworkspace
+2. 选择 Runner target
 3. Signing & Capabilities
 4. 点击 + Capability
 5. 添加 "Sign in with Apple"
 ```
 
-**Step 2: 配置Apple Developer**
-参考anylogin的SETUP_GUIDE.md中的Apple配置部分
+**Step 2**: macOS 默认开 App Sandbox,要给**网络出口**否则连不上 Apple ID 服务。Xcode 同一标签下 "App Sandbox" Capability 已经在,勾选 "Outgoing Connections (Client)"。
 
-**Step 3: 使用**
+**Step 3 ★ 关键易漏**: 检查两份 entitlements 文件**都**有以下 key(Flutter 创建的 macOS 项目有 Debug 和 Release 两份):
+
+`macos/Runner/DebugProfile.entitlements`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Sign in with Apple 必须 -->
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+    <!-- 网络出口必须 -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Flutter 自带的其他 key 保持不动 -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+</dict>
+</plist>
+```
+
+`macos/Runner/Release.entitlements`: 同上 (Release 一般少 `cs.allow-jit` 和 `network.server`,把 `applesignin` + `network.client` 加进去即可)
+
+**最低系统**: macOS 10.15+,Xcode 11+
+
+#### 5.4 使用 + 平台分发
+
+SDK 自动判断:
+- iOS / macOS → 原生 Sign in with Apple 系统弹窗
+- 其他平台(Android / Web / Windows / Linux) → WebView 登录
+
 ```dart
 try {
-  final result = await EasyAuth().loginWithApple();
+  final result = await EasyAuth().loginWithApple(context);  // context 必传给 webview 兜底用
   if (result.isSuccess) {
-    print('Apple登录成功: ${result.token}');
-    print('用户信息: ${result.userInfo}');
+    print('Apple 登录成功: ${result.token}');
   }
 } on PlatformException catch (e) {
   if (e.code == 'UNAVAILABLE') {
-    print('iOS 13.0+ 才支持');
+    print('系统版本太低,iOS 13.0+ / macOS 10.15+ 才支持');
   } else if (e.code == 'USER_CANCELLED') {
     print('用户取消');
   }
 }
 ```
 
-#### Android注意
-- Android **不支持** Apple ID原生登录
-- 如需支持，使用Web方式（Sign in with Apple JS）
+#### 5.5 排错 — macOS 回落 WebView 怎么办?
+
+如果 macOS 弹出的是 WebView 登录而不是系统原生窗,**Flutter console 一定有这条 log**:
+
+```
+🍎 [native-apple] PlatformException: code=XXX message=...
+🍎 [native-apple] 可能是 macOS / iOS 缺 Sign in with Apple entitlement;回落到 WebView 登录。
+```
+
+按 code 判断:
+- `code='1000'` / message 含 cancel → 用户主动取消(SDK 不会回落,直接抛 User cancelled)
+- 其他 code → 通常是 entitlement / Capability / provisioning profile 没配齐,按 5.3 再检查一遍
+- 没看到 `🍎 [native-apple]` 任何 log → `_shouldUseAppleNative()` 没命中,检查 `defaultTargetPlatform` 是否是 `iOS` 或 `macOS`(模拟器和真机都应该是)
+
+#### 5.6 Android 注意
+- Android **不支持** Apple ID 原生登录,SDK 会自动走 WebView 路径
+- WebView 用浏览器 cookie,可能要求用户输 Apple ID + 密码 + 二次验证
 
 ### 6. 短信验证码登录
 
