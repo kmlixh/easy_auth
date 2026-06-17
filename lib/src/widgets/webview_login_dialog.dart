@@ -63,8 +63,37 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
     }
   }
 
+  /// 关闭按钮处理 — 只触发 onResult,**不要自己 pop**
+  ///
+  /// dialog 的关闭统一交给 onResult 回调的调用方(例如 WebAppleLoginService
+  /// 在拿到结果后 Navigator.of(dialogContext).pop())。这样保证全路径只
+  /// pop 一次,不会把外层 EasyAuthLoginPage / 业务方根页面误 pop 导致黑屏。
+  void _onCloseButton() {
+    if (_completed) return;
+    _completed = true;
+    widget.onResult(null);
+  }
+
+  /// 系统返回键 / barrierDismissible 触发的关闭 — 同样只触发 onResult
+  Future<bool> _onWillPop() async {
+    if (!_completed) {
+      _completed = true;
+      widget.onResult(null);
+    }
+    return true; // 允许返回键真正关闭 dialog
+  }
+
   @override
   Widget build(BuildContext context) {
+    // WillPopScope 兜底 Android 系统返回键,确保 onResult 一定被触发 —
+    // 否则调用方的 Completer 永远 await 不到结果,出现"卡死"。
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     // 根据fullScreen参数决定显示方式
     if (widget.fullScreen) {
       return Scaffold(
@@ -73,16 +102,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
           backgroundColor: Colors.blue,
           foregroundColor: Colors.white,
           leading: IconButton(
-            onPressed: () {
-              // 关闭时也避免重复回调
-              if (!_completed) {
-                _completed = true;
-                Navigator.of(context).pop();
-                widget.onResult(null);
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _onCloseButton,
             icon: const Icon(Icons.close),
           ),
         ),
@@ -117,16 +137,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
                     ),
                     const Spacer(),
                     IconButton(
-                      onPressed: () {
-                        // 关闭时也避免重复回调
-                        if (!_completed) {
-                          _completed = true;
-                          Navigator.of(context).pop();
-                          widget.onResult(null);
-                        } else {
-                          Navigator.of(context).pop();
-                        }
-                      },
+                      onPressed: _onCloseButton,
                       icon: const Icon(Icons.close, color: Colors.white),
                     ),
                   ],
@@ -240,10 +251,9 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
       // 检查是否有错误
       if (error != null) {
         print('❌ Google OAuth错误: $error');
+        // 只调 onResult,**不要自己 pop dialog** — 跟关闭按钮一样统一让
+        // onResult 调用方负责 pop,避免双 pop 把外层页面也连带 pop 出现黑屏
         widget.onResult(null);
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
         return;
       }
 
