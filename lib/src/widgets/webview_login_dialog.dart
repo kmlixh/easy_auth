@@ -166,59 +166,42 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             userAgent: userAgent,
             allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserGesture: false,
+            // 必须开 — 否则 shouldOverrideUrlLoading 不会回调。
+            useShouldOverrideUrlLoading: true,
           ),
+          // 跨平台最可靠的拦截点 — Android / iOS / macOS 全部触发。
+          // onLoadStop 在 macOS WebView 实现上不稳定,
+          // onNavigationResponse 在 macOS 上根本不调用 → 老版本卡死的根因。
+          shouldOverrideUrlLoading: (controller, navAction) async {
+            final url = navAction.request.url?.toString() ?? '';
+            final callbackUrl = _getCallbackUrl();
+            if (url.startsWith(callbackUrl)) {
+              if (!_completed) {
+                _handleCallback(url);
+              }
+              return NavigationActionPolicy.CANCEL;
+            }
+            return NavigationActionPolicy.ALLOW;
+          },
           onLoadStart: (controller, url) {
             setState(() {
               _isLoading = true;
             });
-            print('🔍 开始加载: $url');
           },
           onLoadStop: (controller, url) {
             setState(() {
               _isLoading = false;
             });
-            print('✅ 页面加载完成: $url');
-
-            // 检查是否是完整的回调URL（必须以回调URL开头）
+            // 兜底:某些平台 shouldOverrideUrlLoading 未拦截就直接到 callback,
+            // 这里再 check 一次。已用 _completed guard 防重复。
             final callbackUrl = _getCallbackUrl();
-            print('🔍 期望的回调URL: $callbackUrl');
-            print('🔍 当前URL: ${url.toString()}');
-            print('🔍 URL匹配检查: ${url.toString().startsWith(callbackUrl)}');
-
-            if (url != null && url.toString().startsWith(callbackUrl)) {
-              print('✅ 检测到完整回调URL，直接处理登录逻辑');
-              // 直接处理回调，不需要等待页面加载完成
+            if (url != null &&
+                url.toString().startsWith(callbackUrl) &&
+                !_completed) {
               _handleCallback(url.toString());
-            } else {
-              print('❌ URL不匹配，跳过处理');
             }
-          },
-          onNavigationResponse: (controller, navigationResponse) async {
-            final url = navigationResponse.response?.url;
-            print('🔍 导航响应: $url');
-
-            // 检查是否是完整的回调URL（必须以回调URL开头）
-            final callbackUrl = _getCallbackUrl();
-            print('🔍 [导航响应] 期望的回调URL: $callbackUrl');
-            print('🔍 [导航响应] 当前URL: ${url.toString()}');
-            print(
-              '🔍 [导航响应] URL匹配检查: ${url.toString().startsWith(callbackUrl)}',
-            );
-
-            if (url != null && url.toString().startsWith(callbackUrl)) {
-              print('✅ [导航响应] 检测到完整回调URL，立即处理登录逻辑');
-              // 直接处理（不再延迟，避免组件销毁后触发）
-              if (!_completed) {
-                _handleCallback(url.toString());
-              }
-              return NavigationResponseAction.ALLOW;
-            }
-
-            // 允许所有其他导航
-            return NavigationResponseAction.ALLOW;
           },
           onReceivedError: (controller, request, error) {
-            print('❌ WebView错误: ${error.description}');
             setState(() {
               _isLoading = false;
             });
