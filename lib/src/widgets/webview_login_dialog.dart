@@ -187,13 +187,31 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             setState(() {
               _isLoading = true;
             });
+            // 第二道防线:onLoadStart 在每次 navigation 开始时触发,包括
+            // Apple OAuth form_post 这种 POST 导航 (shouldOverrideUrlLoading
+            // 在 WKWebView 上对 form POST 不触发,只对 LinkActivated 触发,
+            // 这是 macOS Apple 登录 dialog 卡死的根因)。
+            final callbackUrl = _getCallbackUrl();
+            if (url != null &&
+                url.toString().startsWith(callbackUrl) &&
+                !_completed) {
+              _handleCallback(url.toString());
+            }
+          },
+          onUpdateVisitedHistory: (controller, url, androidIsReload) {
+            // 第三道防线:URL 实际变化时触发,跨平台最稳。
+            final callbackUrl = _getCallbackUrl();
+            if (url != null &&
+                url.toString().startsWith(callbackUrl) &&
+                !_completed) {
+              _handleCallback(url.toString());
+            }
           },
           onLoadStop: (controller, url) {
             setState(() {
               _isLoading = false;
             });
-            // 兜底:某些平台 shouldOverrideUrlLoading 未拦截就直接到 callback,
-            // 这里再 check 一次。已用 _completed guard 防重复。
+            // 第四道防线 (page 渲染完才命中,最慢但兜底)
             final callbackUrl = _getCallbackUrl();
             if (url != null &&
                 url.toString().startsWith(callbackUrl) &&
