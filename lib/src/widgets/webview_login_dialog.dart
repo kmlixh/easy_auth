@@ -106,12 +106,18 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   /// 根据平台类型获取合适的User-Agent
   String _getPlatformSpecificUserAgent() {
     if (Platform.isAndroid) {
-      // Android平台使用移动端User-Agent，服务器会返回移动端优化页面
       return 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36';
-    } else {
-      // 其他平台（Web、Windows、Linux等）使用桌面端User-Agent，服务器会返回桌面端页面
-      return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36';
     }
+    // Apple 登录页用 JS 检测 UA,Windows Chrome UA 会被拒渲染 (白/灰屏)。
+    // macOS / iOS 必须用 Safari UA。
+    if (Platform.isMacOS) {
+      return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
+    }
+    if (Platform.isIOS) {
+      return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    }
+    // Windows / Linux 保持 Chrome UA
+    return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Safari/537.36';
   }
 
   /// 获取标题
