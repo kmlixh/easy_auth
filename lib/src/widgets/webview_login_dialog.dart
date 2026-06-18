@@ -29,6 +29,20 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   InAppWebViewController? _ctrl;
   Timer? _urlPoll;
 
+  /// 诊断:记录每次回调命中 + URL,显示在 dialog 底部。截图给开发者定位问题。
+  final List<String> _diag = [];
+  void _trace(String tag, dynamic url) {
+    final t = DateTime.now().toIso8601String().substring(11, 19); // HH:mm:ss
+    final entry = '$t [$tag] ${url ?? '(null)'}';
+    if (mounted) {
+      setState(() {
+        _diag.add(entry);
+        if (_diag.length > 20) _diag.removeRange(0, _diag.length - 20);
+      });
+    }
+    print('🔍 $entry');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -54,8 +68,7 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
         final uri = await _ctrl?.getUrl();
         if (uri == null) return;
         final url = uri.toString();
-        final cb = _getCallbackUrl();
-        if (url.startsWith(cb)) {
+        if (_matchesCallback(url)) {
           t.cancel();
           if (!_completed) _handleCallback(url);
         }
@@ -63,13 +76,31 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
     });
   }
 
-  /// 获取回调URL
-  String _getCallbackUrl() {
-    final channelId = widget.channelId ?? 'google'; // 默认为google
+  /// 获取回调URL(主)。仅用于日志,实际匹配走 _matchesCallback。
+  String _getCallbackUrl() => _callbackUrls().first;
+
+  /// 兼容的回调 URL 前缀列表 — Apple Developer 上 Service ID 的 redirect_uri
+  /// 历史上配过老的 `api.janyee.com/user/apple/callback`,后端迁到 auth 子域
+  /// 后没改 Service ID,所以 Apple form_post 仍打到老路径。SDK 同时认两个。
+  List<String> _callbackUrls() {
+    final channelId = widget.channelId ?? 'google';
     if (channelId == 'apple') {
-      return 'https://auth.janyee.com/apple/callback';
+      return [
+        'https://auth.janyee.com/apple/callback',
+        'https://api.janyee.com/user/apple/callback', // 兼容 legacy
+      ];
     }
-    return 'https://auth.janyee.com/login/$channelId/callback';
+    return [
+      'https://auth.janyee.com/login/$channelId/callback',
+      'https://api.janyee.com/user/login/$channelId/callback', // 兼容 legacy
+    ];
+  }
+
+  bool _matchesCallback(String url) {
+    for (final cb in _callbackUrls()) {
+      if (url.startsWith(cb)) return true;
+    }
+    return false;
   }
 
   /// 根据平台类型获取合适的User-Agent
@@ -211,11 +242,9 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
           // onNavigationResponse 在 macOS 上根本不调用 → 老版本卡死的根因。
           shouldOverrideUrlLoading: (controller, navAction) async {
             final url = navAction.request.url?.toString() ?? '';
-            final callbackUrl = _getCallbackUrl();
-            if (url.startsWith(callbackUrl)) {
-              if (!_completed) {
-                _handleCallback(url);
-              }
+            _trace('shouldOverride', url);
+            if (_matchesCallback(url)) {
+              if (!_completed) _handleCallback(url);
               return NavigationActionPolicy.CANCEL;
             }
             return NavigationActionPolicy.ALLOW;
@@ -224,36 +253,27 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
             setState(() {
               _isLoading = true;
             });
-            // 第二道防线:onLoadStart 在每次 navigation 开始时触发,包括
-            // Apple OAuth form_post 这种 POST 导航 (shouldOverrideUrlLoading
-            // 在 WKWebView 上对 form POST 不触发,只对 LinkActivated 触发,
-            // 这是 macOS Apple 登录 dialog 卡死的根因)。
-            final callbackUrl = _getCallbackUrl();
-            if (url != null &&
-                url.toString().startsWith(callbackUrl) &&
-                !_completed) {
-              _handleCallback(url.toString());
+            _trace('onLoadStart', url);
+            final s = url?.toString();
+            if (s != null && _matchesCallback(s) && !_completed) {
+              _handleCallback(s);
             }
           },
           onUpdateVisitedHistory: (controller, url, androidIsReload) {
-            // 第三道防线:URL 实际变化时触发,跨平台最稳。
-            final callbackUrl = _getCallbackUrl();
-            if (url != null &&
-                url.toString().startsWith(callbackUrl) &&
-                !_completed) {
-              _handleCallback(url.toString());
+            _trace('onUpdateVisitedHistory', url);
+            final s = url?.toString();
+            if (s != null && _matchesCallback(s) && !_completed) {
+              _handleCallback(s);
             }
           },
           onLoadStop: (controller, url) {
             setState(() {
               _isLoading = false;
             });
-            // 第四道防线 (page 渲染完才命中,最慢但兜底)
-            final callbackUrl = _getCallbackUrl();
-            if (url != null &&
-                url.toString().startsWith(callbackUrl) &&
-                !_completed) {
-              _handleCallback(url.toString());
+            _trace('onLoadStop', url);
+            final s = url?.toString();
+            if (s != null && _matchesCallback(s) && !_completed) {
+              _handleCallback(s);
             }
           },
           onReceivedError: (controller, request, error) {
