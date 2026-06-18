@@ -1,6 +1,8 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'dart:io';
 
 /// WebView登录对话框
 class WebViewLoginDialog extends StatefulWidget {
@@ -24,10 +26,41 @@ class WebViewLoginDialog extends StatefulWidget {
 class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
   bool _isLoading = true;
   bool _completed = false; // 防止重复调用onResult
+  InAppWebViewController? _ctrl;
+  Timer? _urlPoll;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _urlPoll?.cancel();
+    super.dispose();
+  }
+
+  /// 终极兜底:每 500ms 主动 poll 当前 URL。
+  /// macOS WKWebView 上 form_post 触发的 navigation 在 InAppWebView 各种回调
+  /// 上都不稳,只有主动读 controller.getUrl() 是可靠的。
+  void _startUrlPolling() {
+    _urlPoll?.cancel();
+    _urlPoll = Timer.periodic(const Duration(milliseconds: 500), (t) async {
+      if (_completed || !mounted) {
+        t.cancel();
+        return;
+      }
+      try {
+        final uri = await _ctrl?.getUrl();
+        if (uri == null) return;
+        final url = uri.toString();
+        final cb = _getCallbackUrl();
+        if (url.startsWith(cb)) {
+          t.cancel();
+          if (!_completed) _handleCallback(url);
+        }
+      } catch (_) {/* poll 出错就跳过这次 */}
+    });
   }
 
   /// 获取回调URL
@@ -160,6 +193,10 @@ class _WebViewLoginDialogState extends State<WebViewLoginDialog> {
     return Stack(
       children: [
         InAppWebView(
+          onWebViewCreated: (c) {
+            _ctrl = c;
+            _startUrlPolling();
+          },
           initialUrlRequest: URLRequest(url: WebUri(widget.loginUrl)),
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
