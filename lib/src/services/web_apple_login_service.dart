@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../easy_auth_core.dart';
 import '../widgets/webview_login_dialog.dart';
 
 /// Web Apple登录服务
@@ -28,10 +29,15 @@ class WebAppleLoginService {
   }
 
   /// 构建登录URL
+  ///
+  /// **必须带 tenant_id 参数**。不带的话 AnyLogin 后端会 fallback 到默认 tenant
+  /// (kiku),用 kiku 的 Apple Service ID 起步 OAuth,但 callback 后又按
+  /// SDK 持有的 tenant 去 exchange token → client_id mismatch。
   String _buildLoginUrl() {
-    // 使用正确的API路径
-    const baseUrl = 'https://auth.janyee.com';
-    return '$baseUrl/login/apple';
+    final cfg = EasyAuth().config;
+    final baseUrl = cfg.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final tenantId = Uri.encodeQueryComponent(cfg.tenantId);
+    return '$baseUrl/login/apple?tenant_id=$tenantId';
   }
 
   /// 显示WebView登录页面

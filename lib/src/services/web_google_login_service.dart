@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../easy_auth_core.dart';
 import '../widgets/webview_login_dialog.dart';
 
 /// Web Google登录服务
@@ -27,11 +28,13 @@ class WebGoogleLoginService {
     }
   }
 
-  /// 构建登录URL
+  /// 构建登录URL — 同 web_apple_login_service.dart,必须带 tenant_id,
+  /// 否则 backend fallback 到默认 tenant,OAuth/exchange 用不同 client_id 报 mismatch。
   String _buildLoginUrl() {
-    // 使用正确的API路径
-    const baseUrl = 'https://auth.janyee.com/login';
-    return '$baseUrl/google';
+    final cfg = EasyAuth().config;
+    final baseUrl = cfg.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    final tenantId = Uri.encodeQueryComponent(cfg.tenantId);
+    return '$baseUrl/login/google?tenant_id=$tenantId';
   }
 
   /// 显示WebView登录页面
