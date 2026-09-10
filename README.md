@@ -193,8 +193,20 @@ print('昵称: ${user?.nickname}');
 // 获取当前Token
 final token = EasyAuth().currentToken;
 
-// 刷新Token
+// 业务请求前获取可用 Token，即将过期时会自动刷新
+final validToken = await EasyAuth().getValidToken();
+
+// 强制刷新 Token
 final newToken = await EasyAuth().refreshToken();
+
+// 监听登录、Token 刷新和会话失效，避免业务层缓存旧 Token
+final subscription = EasyAuth().onSessionChanged.listen((session) {
+  if (session == null) {
+    // 跳转登录页
+  } else {
+    apiToken = session.token;
+  }
+});
 
 // 获取用户信息（强制刷新）
 final userInfo = await EasyAuth().getUserInfo(forceRefresh: true);
@@ -212,14 +224,16 @@ await EasyAuth().logout();
 | baseUrl | String | 是 | anylogin后端服务地址（**不含** `/login` 前缀） | `https://api.janyee.com` |
 | tenantId | String | 是 | 租户ID | `kiku_app` |
 | sceneId | String | 是 | 登录场景ID | `app_native`, `web_login` |
-| tokenExpiry | Duration | 否 | Token有效期，默认7天 | `Duration(days: 7)` |
 | enableAutoRefresh | bool | 否 | 是否启用自动刷新，默认true | `true` |
+| autoRefreshInterval | Duration | 否 | 会话检查间隔，默认15分钟 | `Duration(minutes: 15)` |
 
 **重要说明**:
 - `baseUrl` **不应该**包含 `/login` 路由前缀
 - API客户端会自动添加 `/login/xxx` 路径
 - 例如：`baseUrl` = `https://api.janyee.com`，API路径 = `/login/getTenantConfig`
 - 最终请求: `https://api.janyee.com/login/getTenantConfig` ✅
+- 自动刷新会在 JWT 剩余5分钟内执行；临时网络错误不会清除仍有效的会话
+- 应用后台休眠后恢复时，计时器会继续校验；已过期且无法刷新时才通知重新登录
 
 ### 登录场景说明
 
